@@ -4,7 +4,7 @@ import I_DOWNLOAD from '/icon/download.webp';
 import I_LINK from '/icon/url.webp';
 import I_MATCH from '/icon/match.webp';
 import I_ORDER from '/icon/transmit.webp';
-import I_EXPLORER from '/app/explorer.webp';
+import I_EXPLORER from '/images/app/explorer.webp';
 import I_NEW from '/icon/new.webp';
 import I_FOLDER from '/icon/folder.webp';
 import I_TXT from '/icon/textfile.webp';

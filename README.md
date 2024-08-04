@@ -1,4 +1,4 @@
-![vList5](public/favicon.svg)
+![vList5](public/images/favicon.svg)
 
 # vList5-aList
 <span style="color: gray">性能与全能兼得！</span>

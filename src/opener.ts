@@ -1,16 +1,16 @@
-import I_VSCODE from '/app/vscode.webp';
-import I_CHROME from '/app/chrome.webp';
-import I_HEX from '/app/hex.webp';
+import I_VSCODE from '/images/app/vscode.webp';
+import I_CHROME from '/images/app/chrome.webp';
+import I_HEX from '/images/app/hex.webp';
 import type { MessageOpinion, OpenerOption, vFile } from './env';
 import { clipFName, Global } from './utils';
-import I_ART from '/app/artplayer.webp';
-import I_APLAYER from '/app/aplayer.webp';
-import I_VLITE from "/app/vlite.svg";
-import I_MUYA from '/app/muya.webp';
-import I_VPLAYER from '/app/vplayer.webp';
-import I_IMAGER from '/app/imager.webp';
-import I_DESIGNER from '/app/desginer.webp';
-import I_MEDIA from '/app/video.webp';
+import I_ART from '/images/app/artplayer.webp';
+import I_APLAYER from '/images/app/aplayer.webp';
+import I_VLITE from "/images/app/vlite.svg";
+import I_MUYA from '/images/app/muya.webp';
+import I_VPLAYER from '/images/app/vplayer.webp';
+import I_IMAGER from '/images/app/imager.webp';
+import I_DESIGNER from '/images/app/desginer.webp';
+import I_MEDIA from '/images/app/video.webp';
 
 import Imager from './opener/imager.vue';
 import Browser from './opener/browser.vue';

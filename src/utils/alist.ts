@@ -9,7 +9,7 @@ type StringNumber = string;
 type StringJSON = string;
 type Driver = 'local';
 
-interface Alist_Setting {
+export interface Alist_Setting {
     allow_indexed: StringBool;
     allow_mounted: StringBool;
     announcement: string;
@@ -45,7 +45,7 @@ interface Alist_Setting {
     webauthn_login_enabled: StringBool;
 }
 
-interface Alist_User {
+export interface Alist_User {
     base_path: string;
     disabled: boolean;
     id: number;
@@ -57,7 +57,7 @@ interface Alist_User {
     username: string;
 }
 
-interface Alist_Stat{
+export interface Alist_Stat{
     created: string;
     hash_info: null | string;
     hashinfo: "null" | string;
@@ -75,7 +75,7 @@ interface Alist_Stat{
     type: number;
 }
 
-interface Alist_ListDir{
+export interface Alist_ListDir{
     content: Array<Alist_Stat>
     header: string
     provider: string
@@ -84,7 +84,7 @@ interface Alist_ListDir{
     write: boolean
 }
 
-interface AList_Driver_Config_Item {
+export interface AList_Driver_Config_Item {
     "name": string,
     "type": "string" | "number" | "bool" | "select",
     "default": StringBool | StringNumber | string,
@@ -93,7 +93,7 @@ interface AList_Driver_Config_Item {
     "help": string
 }
 
-interface Alist_Driver_Config{
+export interface Alist_Driver_Config{
     "common": Array<AList_Driver_Config_Item>,
     "additional": Array<AList_Driver_Config_Item>,
     "config": {
@@ -109,7 +109,7 @@ interface Alist_Driver_Config{
     }
 }
 
-interface Alist_Driver_Current_Config{
+export interface Alist_Driver_Current_Config{
     addition : string;
     cache_expiration: number;
     disabled: boolean;

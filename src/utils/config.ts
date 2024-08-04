@@ -3,7 +3,7 @@ import Setting from "@/module/setting.vue";
 import { Global } from "@/utils";
 import { markRaw, ref, type Ref } from "vue";
 
-import I_SETTING from '/app/settings.webp';
+import I_SETTING from '/images/app/settings.webp';
 import { TREE_REG } from "@/action/tree";
 
 var CONFIG: undefined | Record<string,Array<SettingItem>>,

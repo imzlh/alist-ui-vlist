@@ -110,12 +110,12 @@ export default defineConfig({
                 ],
                 icons: [
                     {
-                        src: 'favicon.ico',
+                        src: 'images/favicon.ico',
                         sizes: '128x128',
                         type: 'image/ico'
                     },
                     {
-                        src: 'favicon.svg',
+                        src: 'images/favicon.svg',
                         sizes: '512x512',
                         type: 'image/svg+xml'
                     }
