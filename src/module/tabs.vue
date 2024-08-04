@@ -2,7 +2,7 @@
 	import type { CtxDispOpts, TabWindow } from '@/env';
 	import { Global } from '@/utils';
 	import { ref, reactive, toRaw, markRaw } from 'vue';
-	import I_OFF from "/icon/off.webp";
+	import I_OFF from "/images/icon/off.webp";
 
 	const tabs = reactive<Array<TabWindow>>([]),
 		current = ref(-1);

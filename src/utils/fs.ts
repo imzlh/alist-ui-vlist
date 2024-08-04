@@ -1,5 +1,5 @@
 import type { FileAndDir, vDir } from "@/env";
-import I_DESKTOP from '/icon/desktop.webp';
+import I_DESKTOP from '/images/icon/desktop.webp';
 import { reactive, ref, watch } from "vue";
 import type { AlertOpts, FileOrDir, ListPredirect, vFile, vSimpleFileOrDir } from "@/env";
 import { APP_API, DEFAULT_DIR_ICON, FILE_PROXY_SERVER, Global, getConfig } from "@/utils";

@@ -145,15 +145,15 @@
         <div class="header">
             <!-- 新建 -->
             <div class="btn" tabindex="-1">
-                <img src="/icon/new.webp">
+                <img src="/images/icon/new.webp">
                 <span @click="event('action','create')">新建</span>
                 <div class="submenu">
                     <div @click="event('action','create_dir')">
-                        <img src="/icon/dir.webp">
+                        <img src="/images/icon/dir.webp">
                         <span>文件夹</span>
                     </div>
                     <div @click="event('action','create_dir')">
-                        <img src="/icon/file.webp">
+                        <img src="/images/icon/file.webp">
                         <span>文件</span>
                     </div>
                 </div>
@@ -163,32 +163,32 @@
             <div class="split"></div>
             <!-- 剪切 -->
             <div class="btn" @click="FACTION.mark('move')">
-                <img src="/icon/cut.webp">
+                <img src="/images/icon/cut.webp">
                 <desc>剪切</desc>
             </div>
             <!-- 拷贝 -->
             <div class="btn" @click="FACTION.mark('copy')">
-                <img src="/icon/copy.webp">
+                <img src="/images/icon/copy.webp">
                 <desc>复制</desc>
             </div>
             <!-- 粘贴 -->
             <div class="btn" @click="FACTION.exec(CFG.parent)" :disable="getActiveFile(CFG.parent).length == 0">
-                <img src="/icon/paste.webp">
+                <img src="/images/icon/paste.webp">
                 <desc>粘贴</desc>
             </div>
             <!-- 重命名 -->
             <div class="btn" @click="getActiveFile(CFG.parent)[0].rename = true">
-                <img src="/icon/rename.webp">
+                <img src="/images/icon/rename.webp">
                 <desc>重命名</desc>
             </div>
             <!-- 删除 -->
             <div class="btn" @click="del">
-                <img src="/icon/del.svg">
+                <img src="/images/icon/del.svg">
                 <desc>删除</desc>
             </div>
             <div class="split"></div>
             <div class="btn" tabindex="-1">
-                <img src="/icon/transmit.webp">
+                <img src="/images/icon/transmit.webp">
                 <span>排序</span>
                 <div class="submenu">
                     <div :active="CFG.order == 'name'" @click="CFG.order = 'name'">
@@ -213,15 +213,15 @@
                 <desc>定义列表样式</desc>
             </div>
             <div class="btn" tabindex="-1">
-                <img src="/icon/display.webp">
+                <img src="/images/icon/display.webp">
                 <span>查看</span>
                 <div class="submenu">
                     <div :active="CFG.style == 'view'" @click="CFG.style = 'view'">
-                        <img src="/icon/viewlarge.webp">
+                        <img src="/images/icon/viewlarge.webp">
                         <span>大图标</span>
                     </div>
                     <div :active="CFG.style == 'list'" @click="CFG.style = 'list'">
-                        <img src="/icon/viewinfo.webp">
+                        <img src="/images/icon/viewinfo.webp">
                         <span>详细信息</span>
                     </div>
                 </div>

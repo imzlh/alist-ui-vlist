@@ -1,5 +1,5 @@
-import I_DIR from '/icon/dir.webp';
-import I_File from '/icon/file.webp';
+import I_DIR from '/images/icon/dir.webp';
+import I_File from '/images/icon/file.webp';
 import { APP_ROOT } from '/config';
 
 enum FileNamePattern {

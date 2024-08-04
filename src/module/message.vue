@@ -120,7 +120,7 @@
                     &::before{
                         content: '';
 
-                        background-image: url('/icon/question.webp');
+                        background-image: url('/images/icon/question.webp');
                         background-repeat: no-repeat;
                         background-size: cover;
                         width: 3rem;
@@ -129,15 +129,15 @@
 
                 }
                 &[data-level=info]::before{
-                    background-image: url('/icon/info.webp');
+                    background-image: url('/images/icon/info.webp');
                 }
 
                 &[data-level=warn]::before{
-                    background-image: url('/icon/warning.webp');
+                    background-image: url('/images/icon/warning.webp');
                 }
 
                 &[data-level=error]::before{
-                    background-image: url('/icon/error.webp');
+                    background-image: url('/images/icon/error.webp');
                 }
 
                 &::before{

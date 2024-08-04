@@ -4,8 +4,8 @@
     import { reactive, ref, shallowRef, watch } from 'vue';
     import List from './list.vue';
     import type { CtxDispOpts } from '@/env';
-    import I_LIST from '/icon/viewinfo.webp';
-    import I_ICON from '/icon/viewlarge.webp';
+    import I_LIST from '/images/icon/viewinfo.webp';
+    import I_ICON from '/images/icon/viewlarge.webp';
 
     const display = ref(false),
         history = ref([] as Array<string>),
