@@ -1,56 +1,27 @@
 ![vList5](public/favicon.svg)
 
 # vList5-aList
-<span style="color: gray">性能与全能的平衡</span>
+<span style="color: gray">性能与全能兼得！</span>
 
 全能还好看的文件管理方案<br>
-使用Vue构建，与NJS集成<br>
+使用Vue构建，直接使用aList作为后端且支持集成<br>
 支持超多打开方式，很多好用的小工具
 
-## 为什么是vList
-vList最初就是为了Nginx设计的，经历了4代的积淀已经拥有成熟的方案了<br>
-为了并发考虑，我们将大部分功能放在了前端，且对于验证机制使用了SHA1-HMAC，安全可靠
+## vList
+修改自我的另一个项目https://github.com/imzlh/vList5
 
-## 目前已经完成
+## vList x aList
+aList支持多种网盘且统一API，而vList支持多种玩法且功能丰富<br>
+a+vList > aList + vList!
 
- - 强大的打开方式
-    - 视频
-    - 音频
-    - 图片
-    - 二进制
-    - 代码/文本
-    - 字体
-    - HTML类
-    - MarkDown编辑
-    - ...(欢迎PR或issue)
- - 完善的UI
-    - 手机端
-    - PC
-    - Windows式重命名、上传移动
-    - 动画(正在计划中)
- - Vue响应式设计
-    - 设置
-    - `getConfig`、`setConfig`
- - 文件操作
-    - 复制
-    - 粘贴
-    - 新建
-    - 上传
-    - 预览操作
-    - 批量操作
-    - explorer窗格
-    - ...(欢迎PR或issue)
- - 额外的支持
-    - libmedia UI
-    - PWA应用
-    - TypeScript化
-    - 内置缓存
+## 使用指南
 
-## 安装指南
+### 1. 分离部署（推荐）
+将vList构建的文件放在一个网页服务器上，将aList分离运行<br>
+修改config.ts或者使用环境变量修改API地址，如
 
-需要NodeJS和<a href="https://github.com/imzlh/vlist-njs">NJS后端</a>
+   VLIST_API=http://demo.org:5244/api/ VLIST_FILE_SERVER=http://demo.org:5244/d/ npm run build
 
-```sh
-npm install
-npm run build
-```
+### 2.打包入aList
+https://alist.nn.ci/zh/guide/install/source.html<br>
+将这个库作为前端文件并构建
