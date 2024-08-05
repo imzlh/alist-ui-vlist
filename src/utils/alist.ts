@@ -168,12 +168,15 @@ const AList ={
         return this.__request('public/offline_download_tools', 'GET');
     },
 
-    get_drivers():Promise<string>{
+    get_driver_names():Promise<string>{
         return this.__request('admin/driver/names', 'GET');
     },
 
-    get_driver_config():Promise<Record<string, Alist_Driver_Config>>{
-        return this.__request('admin/driver/list', 'GET');
+    drv_templates: null as null | Record<string, Alist_Driver_Config>,
+
+    async get_driver_template():Promise<Record<string, Alist_Driver_Config>>{
+        if(!this.drv_templates) this.drv_templates = await this.__request('admin/driver/list', 'GET');
+        return this.drv_templates as Record<string, Alist_Driver_Config>;
     },
 
     async add_driver(name: string, config: Record<string, string | number | boolean>): Promise<number>{
@@ -181,7 +184,7 @@ const AList ={
     },
 
     async get_driver(): Promise<Array<Alist_Driver_Current_Config>>{
-        return (await this.__request('admin/driver/list', 'GET')).current;
+        return (await this.__request('admin/storage/list', 'GET')).content;
     },
 
     stat(path: string): Promise<Alist_Stat>{

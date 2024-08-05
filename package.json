@@ -8,7 +8,8 @@
     "build": "run-p type-check \"build-only {@}\" -- && cp node_modules/libmedia/dist/avplayer/*.avplayer.js dist/assets/ || copy node_modules\\libmedia\\dist\\avplayer\\*.avplayer.js dist/assets/",
     "preview": "vite preview",
     "build-only": "vite build",
-    "type-check": "vue-tsc --build --force"
+    "type-check": "vue-tsc --build --force",
+    "setup-alist": "curl -L https://github.com/alist-org/alist-web/releases/download/3.36.0/dist.tar.gz | tar xz && cp dist/* public/ -r && mv public/index.html alist.html"
   },
   "dependencies": {
     "@muyajs/core": "^0.0.32",
