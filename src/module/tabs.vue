@@ -1,9 +1,9 @@
 <script setup lang="ts">
 	import type { CtxDispOpts, TabWindow } from '@/env';
 	import { Global } from '@/utils';
-	import { ref, reactive, toRaw, markRaw } from 'vue';
+	import { ref, reactive, toRaw, markRaw, watch } from 'vue';
 	import I_OFF from "/images/icon/off.webp";
-import Home from '@/alist/home.vue';
+	import Home from '@/alist/home.vue';
 
 	const tabs = reactive<Record<string, TabWindow>>({}),
 		current = ref<string>('');
@@ -19,6 +19,9 @@ import Home from '@/alist/home.vue';
 		add(item: TabWindow) {
 			const uuid = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
 			tabs[current.value = uuid] = item;
+
+			watch(() => tabs[current.value], val => val || item.onDestroy?.call(item));
+
 			return uuid;
 		}
 	};
@@ -40,6 +43,11 @@ import Home from '@/alist/home.vue';
 			]
 		} satisfies CtxDispOpts)
 	}
+
+	watch(() => tabs[current.value], (now, old) => {
+		now?.onDisplay && now.onDisplay();
+		old?.onLeave && old.onLeave();
+	})
 
 	Global('ui.window').data = func;
 	defineExpose(func);

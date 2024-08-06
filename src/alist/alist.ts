@@ -1,5 +1,5 @@
 import { Global, splitPath } from "@/utils";
-import { getConfig, regConfig } from "./config";
+import { getConfig, regConfig } from "../utils/config";
 import { APP_API } from "/config";
 import jsSHA from "jssha";
 import { Marked } from "marked";
@@ -109,6 +109,52 @@ export interface Alist_Driver_Config{
     }
 }
 
+export enum Alist_ConfigGroup_Names{
+    "基础",
+    "站点",
+    "样式",
+    "预览",
+    "全局",
+    "其他",
+    null,
+    "单点登录",
+    "LDAP登录",
+    "对象存储"
+}
+
+export interface Alist_Config_Group{
+    flag: number;
+    group: number
+    help: string;
+    key: string;
+    options: string;
+    type: "string" | "number" | "bool" | "select";
+    value: string;
+}
+
+export enum Alist_Order_by{
+    "名称",
+    "大小",
+    "修改时间"
+}
+
+export interface Alist_Driver_Create_Param{
+    "id"?: number,
+    "mount_path": string,
+    "order"?: Alist_Order_by,
+    "remark"?: string,   // 备注名
+    "cache_expiration"?: number,
+    "web_proxy": boolean,
+    "webdav_policy"?: '302_redirect' | 'use_proxy_url' | 'native_proxy',
+    "down_proxy_url"?: string,
+    "extract_folder": "front" | "back",
+    "enable_sign": boolean,
+    "driver": string,
+    "order_by": "name" | "size" | "modified",
+    "order_direction": "asc" | "desc",
+    "addition": StringJSON
+}
+
 export interface Alist_Driver_Current_Config{
     addition : string;
     cache_expiration: number;
@@ -128,6 +174,28 @@ export interface Alist_Driver_Current_Config{
     status: "work" | "disabled" | "error"
     web_proxy: boolean;
     webdav_policy:  "native_proxy" | "use_proxy_url"
+}
+
+export enum Alist_Task_Status{
+    "等待",
+    "进行中",
+    "完成",
+    "失败"
+}
+
+export interface Alist_Task_Item{
+    error: string;
+    id: string;
+    name: string
+    progress: number;
+    state: Alist_Task_Status
+    status: string;
+}
+
+export enum Alist_Task_Type{
+    "upload",
+    "offline_download_transfer",
+    "copy"
 }
 
 const AList ={
@@ -185,6 +253,14 @@ const AList ={
 
     async get_driver(): Promise<Array<Alist_Driver_Current_Config>>{
         return (await this.__request('admin/storage/list', 'GET')).content;
+    },
+
+    async create_driver(name: string, config: Alist_Driver_Create_Param): Promise<number>{
+        return await this.__request('admin/storage/create', 'POST', config);
+    },
+
+    async update_driver(config: Alist_Driver_Create_Param): Promise<number>{
+        return await this.__request('admin/storage/update', 'POST', config);
     },
 
     stat(path: string): Promise<Alist_Stat>{
@@ -301,6 +377,46 @@ const AList ={
         return this.__request('fs/remove_empty_directory', 'POST', {
             src_dir
         });
+    },
+
+    rm_driver(id: number){
+        return this.__request('admin/storage/delete?id=' + id, 'POST');
+    },
+
+    set_driver_state(id: number, enable = true){
+        return this.__request('admin/storage/' + (enable? 'enable' : 'disable') + '?id=' + id, 'POST');
+    },
+
+    get_config_group(group: Alist_ConfigGroup_Names): Promise<Array<Alist_Config_Group>>{
+        return this.__request('admin/setting/list?group=' + group, 'GET');
+    },
+
+    save_config_groups(data: Array<Alist_Config_Group>){
+        return this.__request('admin/setting/save', 'POST', data);
+    },
+
+    get_available_downloader(): Promise<Array<string>>{
+        return this.__request('public/offline_download_tools', 'GET');
+    },
+
+    download(urls: Array<string>, dir: string, delete_policy: 
+        "delete_on_upload_succeed" |
+        "delete_on_upload_failed" |
+        "delete_never" |
+        "delete_always" = "delete_on_upload_failed",
+        tool: string | "SimpleHttp"
+    ): Promise<Array<Alist_Config_Group>>{
+        return this.__request('fs/add_offline_download', 'POST', {
+            delete_policy,
+            path: dir,
+            tool,
+            urls
+        })
+    },
+
+    async get_tasks(type: Alist_Task_Type = Alist_Task_Type.offline_download_transfer): Promise<Array<Alist_Task_Item>>{
+        return (await this.__request(`admin/task/${Alist_Task_Type[type]}/undone`, 'GET'))
+            .concat((await this.__request(`admin/task/${Alist_Task_Type[type]}/done`, 'GET')));
     }
 };
 export default AList;

@@ -30,6 +30,11 @@ interface TabWindow {
     onLeave?: Function,
 
     /**
+     * 当窗口关闭时触发的回调函数
+     */
+    onDestroy?: Function,
+
+    /**
      * 窗口的组件
      */
     content: Component,
@@ -38,11 +43,6 @@ interface TabWindow {
      * 窗口的图标
      */
     icon: string,
-
-    /**
-     * 窗口的UUID，用来标记窗口的唯一性
-     */
-    uuid?: string,
 
     /**
      * 传递给组件(content)的额外参数

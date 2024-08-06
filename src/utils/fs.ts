@@ -6,7 +6,7 @@ import { APP_API, DEFAULT_DIR_ICON, FILE_PROXY_SERVER, Global, getConfig } from 
 import { type Ref } from "vue";
 import SHA from "jssha";
 import { getIcon } from "./icon";
-import AList from './alist';
+import AList from '../alist/alist';
 
 export class PermissionDeniedError extends Error{}
 export class LoginError extends Error{}
