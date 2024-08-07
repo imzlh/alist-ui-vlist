@@ -14,6 +14,17 @@ const atype2stype = {
     "select": "select"
 };
 
+function is_null(val: any){
+    if(typeof val == 'number') return false;
+    return !val;
+}
+
+function parse_default(type: 'string' | 'bool' | 'number' | 'select', val: string){
+    if(type == 'bool') return val == 'true';
+    else if(type == 'number') return Number(val);
+    else return val;
+}
+
 function getItem(
     item: AList_Driver_Config_Item,
     exports: { [key: string]: any, addition: Record<string, any> },
@@ -21,11 +32,12 @@ function getItem(
     modified: Ref<boolean>
 ){
     if(
-        (additional && !(item.name in exports.addition)) || 
-        (!additional && !(item.name in exports)) 
+        (additional && is_null(exports.addition[item.name]) ) || 
+        (!additional && is_null(exports[item.name])) 
     ){
         let val;
-        if(item.type === 'bool') val = false;
+        if(item.default) val = parse_default(item.type, item.default);
+        else if(item.type === 'bool') val = false;
         else if(item.type === 'number') val = 0;
         else if(item.type ==='select') val = item.options.split(',')[0];
         else val = "";
@@ -63,7 +75,7 @@ export async function alistDrvSetting(drv: Alist_Driver_Current_Config, template
     configs.push('基础设置');
     for(const item of template.common){
         if(item.name == 'mount_path') continue;
-        exports[item.name] = (drv as any)[item.name] || item.default;
+        exports[item.name] = (drv as any)[item.name] || parse_default(item.type, item.default);
         configs.push(getItem(item, exports, false, modified));
     }
 

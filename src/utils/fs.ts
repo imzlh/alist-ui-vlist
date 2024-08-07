@@ -450,11 +450,15 @@ export const FS = {
             throw new Error('Duplicate file path');
 
         // 重命名
-        const use_move = [] as Array<[string, string]>;
+        const use_move = [] as Array<[string, string]>,
+            // Record<源目录, <[源文件名称, 目标文件名称]>>
+            use_bat_rename = {} as Record<string, Record<string, string>>;
         for(const [src, dst] of Object.entries(fileList))
-            if(splitPath({path: src}).dir == splitPath({path: dst}).dir)
-                await AList.rename(src, splitPath({path: dst}).fname);
-            else
+            if(splitPath({path: src}).dir == splitPath({path: dst}).dir){
+                const info = splitPath({path: src});
+                if(!use_bat_rename[info.dir]) use_bat_rename[info.dir] = {};
+                use_bat_rename[info.dir][info.fname] = splitPath({path: dst}).fname;
+            }else
                 use_move.push([src, dst]);
         if(use_move.length > 0){
             // 筛选目标文件夹一致的文件
@@ -468,6 +472,8 @@ export const FS = {
             for(const [dst_dir, src_list] of Object.entries(move_list))
                 await AList.move(src_list, dst_dir);
         }
+        for (const dir in use_bat_rename)
+            await AList.rename_all(dir, use_bat_rename[dir]);
         // 将这些文件从原TREE位置删除
         for(const [src, dst] of Object.entries(fileList)){
             // 找到原节点
@@ -735,7 +741,7 @@ export const FS = {
             });
             xhr.addEventListener('timeout', rj);
 
-            xhr.open('POST',APP_API + 'api/fs/put');
+            xhr.open('PUT',APP_API + 'fs/put');
             xhr.setRequestHeader('file-path', file);
             xhr.setRequestHeader('Content-Type', content.type);
             xhr.setRequestHeader('authorization', AList.jwt_key);

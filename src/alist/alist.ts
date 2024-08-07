@@ -45,18 +45,6 @@ export interface Alist_Setting {
     webauthn_login_enabled: StringBool;
 }
 
-export interface Alist_User {
-    base_path: string;
-    disabled: boolean;
-    id: number;
-    otp: number;
-    password: string;
-    permission: number;
-    role: number;
-    sso_id: string;
-    username: string;
-}
-
 export interface Alist_Stat{
     created: string;
     hash_info: null | string;
@@ -177,10 +165,16 @@ export interface Alist_Driver_Current_Config{
 }
 
 export enum Alist_Task_Status{
-    "等待",
+    "等待中",
     "进行中",
-    "完成",
-    "失败"
+    "成功",
+    "取消中",
+    "已取消",
+    "错误",
+    "失败回滚中",
+    "失败",
+    "重试中",
+    "重试回滚中",
 }
 
 export interface Alist_Task_Item{
@@ -190,12 +184,114 @@ export interface Alist_Task_Item{
     progress: number;
     state: Alist_Task_Status
     status: string;
+    done: boolean;
 }
 
 export enum Alist_Task_Type{
     "upload",
     "offline_download_transfer",
+    "offline_download",
     "copy"
+}
+
+export enum UserRole {
+    GENERAL,
+    GUEST,
+    ADMIN,
+}
+
+export interface Alist_User_Profile {
+    id: number
+    username: string
+    password: string
+    base_path: string
+    role: UserRole
+    permission: number
+    sso_id: string
+    disabled: boolean
+}
+
+export class Alist_User_Class{
+    private user: Alist_User_Profile
+    constructor(user: Alist_User_Profile){
+        this.user = user
+    }
+
+    get raw(){
+        return this.user;
+    }
+
+    get username(){
+        return this.user.username
+    }
+
+    get base_path(){
+        return this.user.base_path
+    }
+
+    get id(){
+        return this.user.id
+    }
+
+    get disabled(){
+        return this.user.disabled
+    }
+
+    get is_guest(){
+        return this.user.role === UserRole.GUEST
+    }
+
+    get is_admin(){
+        return this.user.role === UserRole.ADMIN
+    }
+    
+    get is_general(){
+        return this.user.role === UserRole.GENERAL
+    }
+
+    can(permission: number){
+        return this.is_admin || ((this.user.permission >> permission) & 1) == 1
+    }
+
+    get can_see_hides(){
+        return this.is_admin || (this.user.permission & 1) == 1
+    }
+
+    get can_access_without_password(){
+        return this.is_admin || ((this.user.permission >> 1) & 1) == 1
+    }
+
+    get can_offline_download_tasks(){
+        return this.is_admin || ((this.user.permission >> 2) & 1) == 1
+    }
+
+    get can_write(){
+        return this.is_admin || ((this.user.permission >> 3) & 1) == 1
+    }
+
+    get can_rename(){
+        return this.is_admin || ((this.user.permission >> 4) & 1) == 1
+    }
+
+    get can_move(){
+        return this.is_admin || ((this.user.permission >> 5) & 1) == 1
+    }
+
+    get can_copy(){
+        return this.is_admin || ((this.user.permission >> 6) & 1) == 1
+    }
+
+    get can_remove(){
+        return this.is_admin || ((this.user.permission >> 7) & 1) == 1
+    }
+
+    get can_webdav_read(){
+        return this.is_admin || ((this.user.permission >> 8) & 1) == 1
+    }
+
+    get can_webdav_manage(){
+        return this.is_admin || ((this.user.permission >> 9) & 1) == 1
+    }
 }
 
 const AList ={
@@ -226,10 +322,6 @@ const AList ={
 
     get_setting(): Promise<Alist_Setting>{
         return this.__request('public/settings', 'GET');
-    },
-
-    get_user(): Promise<Alist_User>{
-        return this.__request('me', 'GET');
     },
 
     get_downloader(): Promise<Array<string>>{
@@ -287,6 +379,30 @@ const AList ={
         })).token;
     },
 
+    async get_profile(user?: number): Promise<Alist_User_Class>{
+        let res;
+        if(user) res = await this.__request('admin/user/get?id=' + user, 'GET');
+        else res = await this.__request('me', 'GET');
+        return new Alist_User_Class(res);
+    },
+
+    update_self_profile(username: string, password: string): Promise<void>{
+        return this.__request('me/update', 'POST', {
+            password,
+            sso_id: "",
+            username
+        });
+    },
+
+    update_profile(data: Alist_User_Profile): Promise<void>{
+        return this.__request('admin/user/update', 'POST', data);
+    },
+
+    async get_all_profile(): Promise<Array<Alist_User_Class>>{
+        const data = await this.__request('admin/user/list', 'GET');
+        return data.content.map((item: Alist_User_Profile) => new Alist_User_Class(item));
+    },
+
     async delete(paths: Array<string>){
         // 寻找dir相同的路径
         const path_prefix = {} as Record<string, Array<string>>;
@@ -316,6 +432,16 @@ const AList ={
         return this.__request('fs/rename', 'POST', {
             path,
             name: new_fname
+        });
+    },
+
+    rename_all(source_dir: string, fileList: Record<string, string>){
+        return this.__request('fs/batch_rename', 'POST', {
+            rename_objects: Object.entries(fileList).map(([old_name, new_name]) => ({
+                src_name: old_name,
+                new_name: new_name
+            })),
+            src_dir: source_dir
         });
     },
 
@@ -415,8 +541,12 @@ const AList ={
     },
 
     async get_tasks(type: Alist_Task_Type = Alist_Task_Type.offline_download_transfer): Promise<Array<Alist_Task_Item>>{
-        return (await this.__request(`admin/task/${Alist_Task_Type[type]}/undone`, 'GET'))
-            .concat((await this.__request(`admin/task/${Alist_Task_Type[type]}/done`, 'GET')));
+        return (await this.__request(`admin/task/${Alist_Task_Type[type]}/undone`, 'GET')).map((item: Object) => ({...item, done: false}))
+            .concat((await this.__request(`admin/task/${Alist_Task_Type[type]}/done`, 'GET')).map((item: Object) => ({...item, done: true})));
+    },
+
+    task_action(action: "delete" | "cancel" | "retry", type: string, id: string){
+        return this.__request(`admin/task/${type}/${action}?id=${id}`, 'POST');
     }
 };
 export default AList;

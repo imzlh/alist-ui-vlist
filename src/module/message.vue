@@ -93,6 +93,7 @@
                     content: $icon_right;
                     opacity: .2;
                     width: 1.2em;
+                    cursor: pointer;
 
                     &:hover {
                         opacity: .8;
