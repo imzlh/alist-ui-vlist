@@ -595,4 +595,8 @@ window.addEventListener('load', async function() {
             timeout: 5
         });
     }
+    // 3.布局
+    const ref = getConfig('基础');
+    ref.appname.value = AList.config.site_title;
+    ref.favicon.value = AList.config.logo;
 });

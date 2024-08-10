@@ -1,7 +1,6 @@
 import I_File from '/images/icon/file.webp';
 import I_DIR from '/images/icon/dir.webp';
 
-export const APP_NAME = 'izCloud';
 export const DEFAULT_FILE_ICON = I_File;
 export const DEFAULT_DIR_ICON = I_DIR;
 export const APP_API = import.meta.env.DEV
