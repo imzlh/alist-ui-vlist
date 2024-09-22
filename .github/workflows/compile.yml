@@ -33,6 +33,7 @@ jobs:
       run: |
         mv dist/ ~/vlist_pkg/
         mv release.tgz ~/dist/
+        
     - name: Setup deno
       run: |
           curl -L https://github.com/denoland/deno/releases/download/v1.45.5/deno-x86_64-unknown-linux-gnu.zip -o deno.zip
