@@ -12,14 +12,12 @@
 ## 为什么是vList
 vList最初就是为了Nginx设计的，经历了4代的积淀已经拥有成熟的方案了<br>
 为了并发考虑，我们将大部分功能放在了前端，且对于验证机制使用了SHA1-HMAC，安全可靠<br>
-在操作逻辑上，我们向Windows靠拢，右键菜单、Shift多选、拖拽、Explorer...简单易用
+在操作逻辑上，我们向Windows靠拢，右键菜单、Shift多选、拖拽、Explorer...简单易用<br>
+修改自我的另一个项目https://github.com/imzlh/vList5
 
-## 项目起源
-本来Github上有很多类似的项目了，有的甚至做的比我好，如KodBox<br>
-但是本人最近开始返璞归真，想要**在最简单的环境下(光猫)部署网盘服务**<br>
-这个环节无法部署Sql服务，装不下Web套装(Nginx+PHP)，这时我就在想创建一个vList项目<br>
-**vList基于Nginx的功能，100%原生支持**，但是随着功能越来越多fancyIndex已经满足不了需求<br>
-于是vList升级到了v5
+## vList x aList
+aList支持多种网盘且统一API，而vList支持多种玩法且功能丰富<br>
+a+vList > aList + vList!
 
 ## 目前已经完成
 
@@ -83,14 +81,14 @@ vList有一个强大的功能：正则匹配（文件夹下右键 -> 文件夹�
  - `[]`框框里填写你想要的格式，如 `a-z` 26个字母 `0-9` 10个数字，在之后添加`+`表示重复多次
 举例：匹配所有 数字+mkv格式的文件，如`hello.001.mkv`，正则为`[0-9]+.mkv$`，就选中了
 
-## 安装指南
+## 使用指南
 
-需要NodeJS和<a href="https://github.com/imzlh/vlist-njs">NJS后端</a><br>
-或者可以在release找到预编译的版本
+### 1. 分离部署（推荐）
+将vList构建的文件放在一个网页服务器上，将aList分离运行<br>
+修改config.ts或者使用环境变量修改API地址，如
 
-```sh
-npm install
-npm run build
-```
+   VLIST_API=http://demo.org:5244/api/ VLIST_FILE_SERVER=http://demo.org:5244/d/ npm run build
 
-将 `dist/` 的内容上传到你的Web服务器(nginx)，访问即可
+### 2.打包入aList
+https://alist.nn.ci/zh/guide/install/source.html<br>
+将这个库作为前端文件并构建
