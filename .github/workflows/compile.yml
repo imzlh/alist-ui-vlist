@@ -49,7 +49,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - name: Build
-        run: ~/deno run -A --unstable ./setup.ts
+        run: ~/deno run -A --unstable ./build/setup.ts
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
