@@ -31,6 +31,7 @@ jobs:
       - run: tar -zcvf release.tgz dist/
       - name: rename
         run: |
+          mkdir /home/runner/dist/ -p
           mv dist/ ~/vlist_pkg/
           mv release.tgz ~/dist/
         
