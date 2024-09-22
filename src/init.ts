@@ -38,6 +38,9 @@ import './opener';
 // 主要的应用入口
 import App from './App.vue';
 
+// 异步加载的插件系统
+window.addEventListener('load', () => import('./utils/plugin'));
+
 interface Touch{
     x: number,
     y: number,
@@ -102,6 +105,34 @@ document.documentElement.addEventListener('touchend', ev => {
             touch.lastClick.value = now;
     }
     touch = undefined;
+});
+
+// 拖拽管理
+let dragEl: {
+    el: HTMLElement,
+    x: number,
+    y: number,
+    rx: number,
+    ry: number
+} | undefined;
+document.documentElement.addEventListener('pointermove', e => {
+    if(!dragEl) return;
+    e.preventDefault();
+    dragEl.el.style.left = `${e.clientX - dragEl.x + dragEl.rx}px`,
+    dragEl.el.style.top = `${e.clientY - dragEl.y + dragEl.ry}px`;
+    document.documentElement.style.cursor = 'grabbing';
+});
+document.documentElement.addEventListener('pointerup', () => {
+    dragEl = undefined;
+    document.documentElement.style.cursor = 'default';
+});
+document.documentElement.addEventListener('pointerleave', () => {
+    if(!dragEl) return;
+    // 回到原位
+    dragEl.el.style.left = `${dragEl.rx}px`,
+    dragEl.el.style.top = `${dragEl.ry}px`,
+    dragEl = undefined;
+    document.documentElement.style.cursor = 'default';
 })
 
 // 挂载应用
@@ -127,5 +158,27 @@ app.directive('touch', {
         touch = undefined
     }
 });
+app.directive('drag', {
+    mounted(el: HTMLElement) {
+        el.addEventListener('pointerdown', ev => ev.button == 0 && (ev.target as HTMLElement).classList.contains('drag') && (dragEl = {
+            el, x: ev.clientX, y: ev.clientY, rx: el.offsetLeft, ry: el.offsetTop
+        }));
+    }
+});
+
+// OPTIONAL vWebView
+import { vWebView } from  './utils/webview';
+app.directive('webview', function(el: HTMLElement, binding) {
+    if((el.shadowRoot as any)?.__webview__)
+        return (el.shadowRoot as any).__webview__.src = binding.value;
+
+    const view = new vWebView(el);
+    if(binding.arg)
+        for(const arg of binding.arg)
+            view.addArg(arg);
+
+    view.src = binding.value;
+    (el.shadowRoot as any).__webview__ = view;
+})
 
 app.mount(document.body);

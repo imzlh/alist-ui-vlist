@@ -17,10 +17,11 @@ import I_RENAME from '/images/icon/rename.webp';
 import I_OPEN from "/images/icon/open.webp";
 import I_OPENER from '/images/icon/opener.webp';
 import I_DELETE from '/images/icon/del.svg';
+import I_BANGUMI from '/images/icon/bangumi.webp';
 
 import Upload from '@/module/upload.vue';
 import EXPLORER from '@/module/explorer.vue';
-import { FACTION, FS, Global, TREE, clearActiveFile, getActiveFile, openFile, size2str, splitPath } from "@/utils";
+import { FACTION, FS, alert, clearActiveFile, createWindow, getActiveFile, message, openFile, selectOpener, size2str, splitPath } from "@/utils";
 import type { AlertOpts, MessageOpinion, vDir, vFile } from "@/env";
 import { CtxMenuRegister } from './main';
 
@@ -36,7 +37,7 @@ TREE_REG.register(indir => ({
             "text": "文件夹",
             "icon": I_FOLDER,
             handle: () =>
-                Global('ui.alert').call({
+                alert({
                     "type": "prompt",
                     "title": "创建文件夹",
                     "message": "请输入文件夹名称",
@@ -49,7 +50,7 @@ TREE_REG.register(indir => ({
             "text": "文件",
             "icon": I_TXT,
             handle: () =>
-                Global('ui.alert').call({
+                alert({
                     "type": "prompt",
                     "title": "新建文件",
                     "message": "请输入文件名称",
@@ -69,7 +70,7 @@ TREE_REG.register(indir => ({
     "text": "上传",
     "icon": I_UPLOAD,
     handle: () => {
-        Global('ui.window.add').call({
+        createWindow({
             "content": Upload,
             "icon": I_UPLOAD,
             "name": "上传文件",
@@ -130,7 +131,7 @@ TREE_REG.register(() => ({
             const mark = FACTION.marked.map(item => item.name),
                 over = dir.child.filter(item => mark.includes(item.name));
             if (over.length > 0)
-                await new Promise(rs => Global('ui.alert').call({
+                await new Promise(rs => alert({
                     "type": "confirm",
                     "title": "覆盖或合并提示",
                     "message": "这些文件将会被合并/覆盖\n\n" +
@@ -152,9 +153,9 @@ TREE_REG.register(() => ({
     "icon": I_DELETE,
     handle: async () => {
         try {
-            await FS.delete(getActiveFile().map(item => item.path))
+            await FS.del(getActiveFile().map(item => item.path))
         } catch (e) {
-            return Global('ui.message').call({
+            return message({
                 'type': 'error',
                 'content': {
                     'title': '删除失败',
@@ -197,7 +198,7 @@ TREE_REG.register(() => ({
     "text": "打开方式",
     "icon": I_OPENER,
     handle() {
-        Global('opener.choose').call(getActiveFile()[0] as vFile)
+        selectOpener(getActiveFile()[0] as vFile)
             .then(opener => opener.open(getActiveFile()[0] as vFile));
     },
 }), {
@@ -213,7 +214,7 @@ TREE_REG.register(() => ({
     'icon': I_LINK,
     'text': '转到目录',
     handle() {
-        Global('ui.alert').call({
+        alert({
             'type': 'prompt',
             'title': '转到目录',
             'message': '输入目录名称，支持隐藏目录',
@@ -235,7 +236,7 @@ TREE_REG.register(() => ({
             "text": "正则匹配",
             'icon': I_MATCH,
             handle() {
-                Global('ui.alert').call({
+                alert({
                     'title': '正则匹配',
                     'message': '请输入正则表达式(忽略大小写)，匹配到的文件将被标记',
                     'type': 'prompt',
@@ -244,7 +245,7 @@ TREE_REG.register(() => ({
                             var preg = new RegExp(data as string, 'i'),
                                 item = getActiveFile()[0] as vDir;
                         } catch (e) {
-                            return Global('ui.message').call({
+                            return message({
                                 'title': '正则错误',
                                 'content': {
                                     'title': '无法加载正则表达式',
@@ -256,30 +257,88 @@ TREE_REG.register(() => ({
                         }
 
                         if (!item.child) await FS.loadTree(item);
-                        if (!item.child) return; // for TypeScript TypeCheck
+                        item.unfold = true;
 
                         clearActiveFile();
-                        for (let i = 0; i < item.child.length; i++)
-                            if (preg.test(item.child[i].name)) {
-                                item.active.set(item.child[i], item.child[i].path);
-                                getActiveFile().push(item.child[i]);
+                        for (let i = 0; i < item.child!.length; i++)
+                            if (preg.test(item.child![i].name)) {
+                                item.active.set(item.child![i], item.child![i].path);
+                                getActiveFile().push(item.child![i]);
                             }
-
-                        (document.querySelector('.left > div.files') as HTMLElement).focus();
                     },
                 } satisfies AlertOpts);
+            },
+        }, {
+            "text": "番剧快速重命名",
+            "icon": I_BANGUMI,
+            async handle() {
+                // 将视频(mkv mp4等) 字幕(srt ass vtt等)分别分类重命名
+                const dir = getActiveFile()[0] as vDir;
+                if (!dir.child) await FS.loadTree(dir);
+                const video = dir.child!.filter(item => item.name.endsWith('.mkv') || item.name.endsWith('.mp4')),
+                    subtitle = dir.child!.filter(item => item.name.endsWith('.ass') || item.name.endsWith('.srt') || item.name.endsWith('.vtt')),
+                    rename = {} as Record<string, string>,
+                    dels = [] as Array<string>;
+                for (let i = 0; i < video.length; i++) {
+                    const info = splitPath(video[i]);
+                    rename[video[i].path] = info.dir + (i +1).toString().padStart(3, '0') + '.' + info.ext;
+                }
+                let subi = 1;
+                for (let i = 0; i < subtitle.length; i++) {
+                    const info = splitPath(subtitle[i]);
+                    if(info.name.toLowerCase().includes('cht') || info.name.toLowerCase().includes('tc'))
+                        dels.push(subtitle[i].path);
+                    else 
+                        rename[subtitle[i].path] = info.dir + (subi ++).toString().padStart(3, '0') + '.' + info.ext;
+                }
+
+                FS.rename(rename);
+                FS.del(dels);
             },
         }, {
             'text': 'explorer窗格',
             'icon': I_EXPLORER,
             async handle() {
-                Global('ui.window.add').call({
+                createWindow({
                     "content": EXPLORER,
                     "icon": I_EXPLORER,
                     "name": 'Explorer',
                     "option": getActiveFile()[0]
                 });
             },
+        }, {
+            'text': '全选',
+            'icon': I_MATCH,
+            async handle() {
+                const item = getActiveFile()[0] as vDir;
+                clearActiveFile();
+                if(!item.child) await FS.loadTree(item);
+                item.unfold = true;
+                item.child!.forEach(child => item.active.set(child, child.path));
+            },
+        }, {
+            'text': '全部展开',
+            'icon': I_FOLDER,
+            handle() {
+                async function unfold(dir: vDir) {
+                    dir.child || await FS.loadTree(dir);
+                    dir.unfold = true;
+                    for(let i = 0; i < dir.child!.length; i++)
+                        if(dir.child![i].type == 'dir')
+                            await unfold(dir.child![i] as vDir);
+                }
+                return unfold(getActiveFile()[0] as vDir);
+            }
+        }, {
+            'text': '全部收起',
+            'icon': I_FOLDER,
+            handle() {
+                const fold = (dir: vDir) => {
+                    dir.unfold = false;
+                    dir.child!.forEach(item => item.type == 'dir' && fold(item))
+                };
+                return fold(getActiveFile()[0] as vDir);
+            }
         }
     ]
 }), {
@@ -327,18 +386,25 @@ TREE_REG.register(() => ({
         {
             'text': '批量排序',
             'icon': I_ORDER,
-            handle() {
+            async handle() {
                 const ordered = getActiveFile().sort((a, b) => a.name.localeCompare(b.name)),
                     obj = {} as Record<string, string>,
-                    reload = [] as Array<string>;
+                    reload = [] as Array<string>
+                const start = parseInt(await new Promise(rs => alert({
+                    "type": "prompt",
+                    "title": "排序",
+                    "message": "请输入起始值，默认为1",
+                    "callback": rs as any
+                }))) || 1;
                 for (let i = 0; i < ordered.length; i++) {
                     const info = splitPath(ordered[i]);
                     ordered[i].lock = true;
-                    obj[ordered[i].path] = info.dir + (i + 1).toString().padStart(3, '0') + '.' + info.ext;
+                    obj[ordered[i].path] = info.dir + (i + start).toString().padStart(3, '0') + '.' + info.ext;
                     if (!reload.includes(info.dir)) reload.push(info.dir);
                 }
                 FS.rename(obj)
-                    .catch((e: Error) => Global('ui.message').call({
+                    .then(() => ordered.forEach(item => item.lock = false))
+                    .catch((e: Error) => message({
                         "type": "error",
                         "title": "文件资源管理器",
                         "content": {
@@ -348,7 +414,7 @@ TREE_REG.register(() => ({
                         "timeout": 5
                     } satisfies MessageOpinion));
             },
-        }
+        }, 
     ]
 }), {
     single: false,

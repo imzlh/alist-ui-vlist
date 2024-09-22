@@ -15,7 +15,7 @@ import I_OPEN from "/images/icon/open.webp";
 import I_OPENER from '/images/icon/opener.webp';
 
 import Upload from '@/module/upload.vue';
-import { FACTION, FS, Global, TREE, getActiveFile, openFile, size2str, splitPath } from "@/utils";
+import { FACTION, FS, alert, createWindow, getActiveFile, message, openFile, selectOpener, size2str } from "@/utils";
 import type { AlertOpts, MessageOpinion, vDir, vFile } from "@/env";
 import { CtxMenuRegister } from './main';
 
@@ -31,7 +31,7 @@ EXP_REG.register(indir => ({
             "text": "文件夹",
             "icon": I_FOLDER,
             handle: () =>
-                Global('ui.alert').call({
+                alert({
                     "type": "prompt",
                     "title": "创建文件夹",
                     "message": "请输入文件夹名称",
@@ -44,7 +44,7 @@ EXP_REG.register(indir => ({
             "text": "文件",
             "icon": I_TXT,
             handle: () =>
-                Global('ui.alert').call({
+                alert({
                     "type": "prompt",
                     "title": "新建文件",
                     "message": "请输入文件名称",
@@ -64,7 +64,7 @@ EXP_REG.register(indir => ({
     "text": "上传",
     "icon": I_UPLOAD,
     handle: () => {
-        Global('ui.window.add').call({
+        createWindow({
             "content": Upload,
             "icon": I_UPLOAD,
             "name": "上传文件",
@@ -126,7 +126,7 @@ EXP_REG.register(() => ({
             const mark = FACTION.marked.map(item => item.name),
                 over = dir.child.filter(item => mark.includes(item.name));
             if (over.length > 0)
-                await new Promise(rs => Global('ui.alert').call({
+                await new Promise(rs => alert({
                     "type": "confirm",
                     "title": "覆盖或合并提示",
                     "message": "这些文件将会被合并/覆盖\n\n" +
@@ -147,9 +147,9 @@ EXP_REG.register(() => ({
     "icon": 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" fill="%23b7a6a6" viewBox="0 0 16 16"><path d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5ZM11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H2.506a.58.58 0 0 0-.01 0H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1h-.995a.59.59 0 0 0-.01 0H11Zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5h9.916Zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47ZM8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5Z"/></svg>',
     handle: async () => {
         try {
-            await FS.delete(getActiveFile()[0].path)
+            await FS.del(getActiveFile()[0].path)
         } catch (e) {
-            return Global('ui.message').call({
+            return message({
                 'type': 'error',
                 'content': {
                     'title': '删除失败',
@@ -193,7 +193,7 @@ EXP_REG.register(() => ({
     "text": "打开方式",
     "icon": I_OPENER,
     handle() {
-        Global('opener.choose').call(getActiveFile()[0] as vFile)
+        selectOpener(getActiveFile()[0] as vFile)
             .then(opener => opener.open(getActiveFile()[0] as vFile));
     },
 }), {

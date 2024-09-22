@@ -1,16 +1,15 @@
 <script lang="ts" setup>
-    import { Global } from '@/utils';
+    import { createWindow } from '@/utils';
     import type { Component } from 'vue';
     import I_ALIST from '/images/app/alist.svg';
     import Drivers from './drivers.vue';
-    import Browser from '@/opener/browser.vue';
     import "./alistUI.scss";
     import Config from './config.vue';
-import Task from './task.vue';
-import User from './user.vue';
+    import Task from './task.vue';
+    import User from './user.vue';
     
     function open(app: Component, name: string){
-        Global('ui.window.add').call({
+        createWindow({
             name,
             "content": app,
             "icon": I_ALIST
@@ -141,6 +140,11 @@ import User from './user.vue';
         height: 16rem;
         padding: 1rem;
         border-radius: .75rem;
+
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
         
         > .title {
             text-align: center;

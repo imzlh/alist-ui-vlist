@@ -1,11 +1,11 @@
 <script lang="ts" setup>
     import { onMounted, onUnmounted, reactive, ref, watch, type Directive } from 'vue';
-    import createAV, { type Export } from '@/utils/avplayer';
-    import type { CtxDispOpts, MessageOpinion, vFile } from '@/env';
-    import { reqFullscreen, UI } from '@/App.vue';
-    import { acceptDrag, FS, Global, splitPath } from '@/utils';
-    import ASS from 'assjs';
-    import MediaSession, { updateMediaSession } from '@/utils/mediaSession';
+    import createAV, { AVState, type Export } from './avplayer/avplayer';
+    import type { MessageOpinion, vFile } from '@/env';
+    import { contextMenu, reqFullscreen, UI } from '@/App.vue';
+    import { acceptDrag, FS, message, splitPath } from '@/utils';
+    import MediaSession, { updateMediaSession } from '@/opener/media/mediaSession';
+import { regSelf } from '@/opener';
 
     const CONFIG = {
         seek_time: 10,
@@ -27,6 +27,13 @@
             "m2ts",
             "ivf",
             "wav"
+        ],
+        subtitle: [
+            "ass",
+            "ssa",
+            "srt",
+            "vtt",
+            "ttml"
         ]
     },vSpeed = {
         mounted(el, bind){
@@ -37,6 +44,13 @@
         }
     } satisfies Directive<HTMLElement, number>;
 
+    let timer: number | NodeJS.Timeout | undefined;
+    function active(){
+        ui.tool = true;
+        if(timer) clearTimeout(timer);
+        timer = setTimeout(() => ui.tool = false, 3000);
+    }
+
     const videoel = ref<HTMLDivElement>(),
         _prop = defineProps(['option', 'visibility']),
         file = _prop.option as vFile,
@@ -44,26 +58,31 @@
             about: false,
             track: false,
             playlist: false,
-            speed: false,
-            videos: [] as Array<vFile & { name: string }>,
-            videoID: 0
+            videos: [] as Array<vFile & { name: string, sub: Record<string, string> }>,
+            videoID: 0,
+            tool: false,
+            alert: ''
         }),
         root = ref<HTMLElement>();
+    
+    active();
 
-    function time2str(time:number){
-        time /= 1000;
-        const min = Math.floor(time / 60),
-            sec = Math.floor(time % 60);
+    function time2str(time: bigint){
+        if(!time) return '00:00';
+        time /= 1000n;
+        const min = time / 60n, sec = time % 60n;
         return min.toString().padStart(2, '0') + ':' + sec.toString().padStart(2, '0');
     }
 
     const exitFullScreen = () => document.exitFullscreen();
 
     const player = ref<Export>();
-    onMounted(function(){
-        player.value = createAV(videoel.value as HTMLDivElement);
-        CTRL.play(file);
-    });
+    onMounted(() => 
+        createAV(videoel.value as HTMLDivElement).then(val => {
+            player.value = val;
+            CTRL.play(file);
+        })
+    );
     onUnmounted(() => player.value?.destroy());
 
     watch(() => _prop.visibility, val => val && player.value && (
@@ -72,8 +91,8 @@
             prev: () => CTRL.prev(),
             play: () => player.value && (player.value.play = true),
             pause: () => player.value && (player.value.play = false),
-            set time(val: number){ player.value?.func.seek(val * 1000); },
-            get time(){ return (player.value?.time.current || 0) / 1000; },
+            set time(val: number){ player.value?.func.seek(BigInt(val) * 1000n); },
+            get time(){ return Number((player.value?.time.current || 0n) / 1000n); },
             seekOnce: CONFIG.seek_time
         },
         updateMediaSession({
@@ -90,7 +109,6 @@
         async play(file: vFile) {
             const dir = splitPath(file)['dir'];
             let id: number | undefined;
-            if(this.ass) this.ass.destroy();
             if (this.dir == dir) {
                 // 找到ID
                 for (let i = 0; i < ui.videos.length; i++)
@@ -103,24 +121,33 @@
                 const list = (await FS.list(dir || '/')).filter(item => item.type == 'file') as vFile[];
                 ui.videos = [];
                 let i = 0;
+                const subMap = {} as Record<string, Record<string, string>>;
                 list.forEach(item => {
                     const info = splitPath(item);
                     // 是视频
                     if (CONFIG.media.includes(info.ext.toLowerCase())) {
                         if (item.name == file.name)
                             id = i;
+                        i ++;
                         // 转换
-                        ui.videos.push({...item, name: info.name});
-                        i++;
+                        ui.videos.push({...item, name: info.name, sub: {}});
+                    // 字幕
+                    }else if(CONFIG.subtitle.includes(info.ext.toLowerCase())){
+                        const sub = subMap[info.name] || (subMap[info.name] = {});
+                        sub[info.ext.toLowerCase()] = item.url;
                     }
                 });
+                // 匹配字幕
+                ui.videos.forEach(item => 
+                    item.name in subMap && (item.sub = subMap[item.name])
+                );
                 // 更新
                 this.dir = dir;
             }
 
             if (id !== undefined){
                 ui.videoID = id;
-            }else Global('ui.message').call({
+            }else message({
                 "type": "error",
                 "title": "vPlayer",
                 "content": {
@@ -139,35 +166,19 @@
             if(ui.videoID == 0)
                 ui.videoID = ui.videos.length -1;
             else ui.videoID --;
-        },
-        ass: undefined as undefined | ASS,
-        async createASS(file: vFile){
-            if(this.ass) this.ass.destroy();
-            const fctx = await (await fetch(file.url)).text();
-            this.ass = new ASS(fctx, videoel.value as any, {
-                container: videoel.value,
-                resampling: 'script_width'
-            });
-            Global('ui.message').call({
-                'type': 'info',
-                'title': 'AVPlayer',
-                'content': {
-                    'title': '成功',
-                    'content': '字母轨道成功渲染'
-                },
-                'timeout': 3
-            } satisfies MessageOpinion);
         }
     };
 
+    onUnmounted(regSelf('avPlayer', CTRL.play));
+
     function ctxmenu(e: MouseEvent){
-        Global('ui.ctxmenu').call({
+        contextMenu({
             'pos_x': e.clientX,
             'pos_y': e.clientY,
             'content': [
                 {
                     "text": "播放速度",
-                    handle: () => ui.speed = true
+                    handle: () => ui.playlist = true
                 },{
                     "text": "播放列表",
                     handle: () => ui.playlist = true
@@ -190,24 +201,24 @@
                     ]
                 },{
                     text: "校准轨道",
-                    handle: () => player.value?.func.seek(player.value.time.current +1)
+                    handle: () => player.value?.func.seek(player.value.time.current +1n)
                 },'---',{
                     "text": "统计信息",
                     handle: () => ui.about = true
                 }
             ]
-        } satisfies CtxDispOpts);
+        });
     }
 
     function basicKbdHandle(e: KeyboardEvent){
-        if(!player.value || player.value.time.total == 0) return;
+        if(!player.value || player.value.time.total == 0n) return;
         switch(e.key){
             case 'ArrowRight':
-                player.value.func.seek(player.value.time.current + 10 * 1000);
+                player.value.func.seek(player.value.time.current + 10000n);
             break;
 
             case 'ArrowLeft':
-                player.value.func.seek(player.value.time.current - 10 * 1000);
+                player.value.func.seek(player.value.time.current - 10000n);
             break;
 
             case 'ArrowUp':
@@ -226,7 +237,47 @@
             case 'Enter':
                 player.value.play = !player.value.play;
             break;
+
+            default:
+                return;
         }
+        e.preventDefault();
+    }
+
+    function float(num: bigint, n: number){
+        const numstr = num.toString(),
+            n1 = numstr.substring(0, numstr.length - n),
+            n2 = numstr.substring(numstr.length - n);
+        return n1 + '.' + n2;
+    }
+
+    function prog(prog: CustomEvent<AVState>){
+        switch(prog.detail){
+            case AVState.ANALYZE_FILE:
+                ui.alert = '分析文件中...';
+            break;
+
+            case AVState.LOAD_AUDIO_DECODER:
+                ui.alert = '加载音频解码器...';
+            break;
+
+            case AVState.LOAD_VIDEO_DECODER:
+                ui.alert = '加载视频解码器...';
+            break;
+
+            case AVState.OPEN_FILE:
+                ui.alert = '打开文件中...';
+            break;
+        }
+    }
+
+    let alertTimer: number | NodeJS.Timeout | undefined;
+    function autoCloseAlert(){
+        ui.alert = '加载完毕'; 
+        if(alertTimer) clearTimeout(alertTimer);
+        alertTimer = setTimeout(() => {
+            ui.alert = '', alertTimer = undefined;
+        }, 2000);
     }
 
     watch(() => ui.videos[ui.videoID], function(vid){
@@ -237,67 +288,55 @@
             "artist": "vPlayer",
             "album": "vPlayer",
             "artwork": []
-        })
+        });
+        watch(() => player.value?.time.current, val => val && vid.sub && Object.entries(vid.sub).forEach(([ext, url]) => 
+            player.value?.func.extSub({
+                "title": ext,
+                "source": url,
+                "lang": "zh-CN"
+            })
+        ), { once: true });
     });
 
-    watch(root, val => acceptDrag(val as HTMLElement, f => 
-        f.type == 'file' &&
-        (f.name.endsWith('.ass') ? CTRL.createASS(f) : CTRL.play(f))
-    ));
-    watch(UI.app_width, w => player.value && (player.value.func.resize = [w, UI.height_total.value]));
-</script>
+    watch(() => _prop.visibility, dis => dis && player.value && updateMediaSession({
+        "title": ui.videos[ui.videoID]?.name || '未在播放',
+        "artist": "vPlayer",
+        "album": "vPlayer",
+        "artwork": []
+    }))
 
-<script lang="ts">
-    const DEFS = {
-        0: BigInt(0),
-        100: BigInt(100)
-    }
+    watch(root, val => acceptDrag(val as HTMLElement, f => 
+        f.type == 'file' && (function(){
+            const info = splitPath(f);
+            if(CONFIG.media.includes(info.ext.toLowerCase()))
+                CTRL.play({...f, name: info.name});
+            else if(CONFIG.subtitle.includes(info.ext.toLowerCase()))
+                player.value?.func.extSub({
+                    source: f.url,
+                    lang: 'zh-CN',
+                    title: info.name
+                });
+        })()
+    ));
+    watch(() => UI.app_width.value * UI.height_total.value, () => player.value && player.value.func.resize());
 </script>
 
 <template>
     <div class="av-container" ref="root" v-touch tabindex="-1"
-        @contextmenu.prevent="ctxmenu" @keydown.prevent.stop="basicKbdHandle"
+        @contextmenu.prevent="ctxmenu" @keydown.stop="basicKbdHandle"
         @dblclick.prevent="player && (player.play = !player.play)"
+        @pointermove="active" @click="active"
     >
-        <div class="video" ref="videoel"></div>
+        <div class="video" ref="videoel"
+            @ended="CTRL.next()" @progress="prog($event as any)" @load="autoCloseAlert()"
+        ></div>
+
+        <div class="alert" :show="!!ui.alert">{{ ui.alert }}</div>
+
         <div class="bar" v-if="player" :style="{
-            pointerEvents: player.time.total == 0 ? 'none' : 'all'
-        }">
-            <div class="time">
-                <div class="current">{{ time2str(player.time.current) }}</div>
-                <div class="timebar" @click="player.func.seek($event.offsetX / ($event.currentTarget as HTMLElement).clientWidth * player.time.total)">
-                    <div :style="{ width: player.time.current / player.time.total * 100 + '%' }"></div>
-                </div>
-                <div class="total">{{ time2str(player.time.total) }}</div>
-            </div>
-            
+            pointerEvents: player.time.total == 0n ? 'none' : 'all'
+        }" :active="ui.tool">
             <div class="icons">
-
-                <!-- 播放列表 -->
-                <div small @click="ui.playlist = !ui.playlist">
-                    <svg viewBox="0 0 16 16">
-                        <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
-                    </svg>
-                </div>
-
-                <!-- 速度 -->
-                <div small @click="ui.speed = !ui.speed">
-                    <svg viewBox="0 0 16 16">
-                        <path
-                            d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022l-.074.997zm2.004.45a7.003 7.003 0 0 0-.985-.299l.219-.976c.383.086.76.2 1.126.342l-.36.933zm1.37.71a7.01 7.01 0 0 0-.439-.27l.493-.87a8.025 8.025 0 0 1 .979.654l-.615.789a6.996 6.996 0 0 0-.418-.302zm1.834 1.79a6.99 6.99 0 0 0-.653-.796l.724-.69c.27.285.52.59.747.91l-.818.576zm.744 1.352a7.08 7.08 0 0 0-.214-.468l.893-.45a7.976 7.976 0 0 1 .45 1.088l-.95.313a7.023 7.023 0 0 0-.179-.483zm.53 2.507a6.991 6.991 0 0 0-.1-1.025l.985-.17c.067.386.106.778.116 1.17l-1 .025zm-.131 1.538c.033-.17.06-.339.081-.51l.993.123a7.957 7.957 0 0 1-.23 1.155l-.964-.267c.046-.165.086-.332.12-.501zm-.952 2.379c.184-.29.346-.594.486-.908l.914.405c-.16.36-.345.706-.555 1.038l-.845-.535zm-.964 1.205c.122-.122.239-.248.35-.378l.758.653a8.073 8.073 0 0 1-.401.432l-.707-.707z" />
-                        <path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0v1z" />
-                        <path
-                            d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5z" />
-                    </svg>
-                </div>
-
-                <!-- 轨道设置 -->
-                <div small @click="ui.track = !ui.track">
-                    <svg viewBox="0 0 16 16">
-                        <path d="M14 4.577v6.846L8 15V1l6 3.577zM8.5.134a1 1 0 0 0-1 0l-6 3.577a1 1 0 0 0-.5.866v6.846a1 1 0 0 0 .5.866l6 3.577a1 1 0 0 0 1 0l6-3.577a1 1 0 0 0 .5-.866V4.577a1 1 0 0 0-.5-.866L8.5.134z"/>
-                    </svg>
-                </div>
-
                 <!--上一个-->
                 <div @click.stop="CTRL.prev()">
                     <svg viewBox="0 0 16 16">
@@ -312,7 +351,7 @@
                         <path
                             d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z" />
                     </svg>
-                    <svg viewBox="0 0 16 16" v-show="player.play" style="transform: scale(1.2);">
+                    <svg viewBox="0 0 16 16" v-show="player.play">
                         <path
                             d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5zm5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5z" />
                     </svg>
@@ -324,11 +363,48 @@
                             d="M12.5 4a.5.5 0 0 0-1 0v3.248L5.233 3.612C4.693 3.3 4 3.678 4 4.308v7.384c0 .63.692 1.01 1.233.697L11.5 8.753V12a.5.5 0 0 0 1 0V4z" />
                     </svg>
                 </div>
-                
+            </div>
+
+            <div class="time">
+                <div class="current">{{ time2str(player.time.current) }}</div>
+                <div class="timebar" @click="player.func.seek(BigInt(Math.floor($event.offsetX / ($event.currentTarget as HTMLElement).clientWidth * Number(player.time.total / 1000n))) * 1000n)">
+                    <div class="prog" :style="{ width: float((player.time.current || 0n) * 10000n / (player.time.total || 1n), 2)+ '%' }"></div>
+                    <div class="chapter" v-if="player.time.total">
+                        <div v-for="(chap, i) in player.tracks.chapter" :style="{
+                            left: float((chap.start || 0n) / player.time.total, 4) + '%'
+                        }" :title="'Chapter' + i"></div>
+                    </div>
+                </div>
+                <div class="total">{{ time2str(player.time.total) }}</div>
+            </div>
+            
+            <div class="icons" style="flex-shrink: 1;overflow-x: auto;">
+
+                <!-- 播放列表 -->
+                <div small @click="ui.playlist = !ui.playlist">
+                    <svg viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+                    </svg>
+                </div>
+
+                <!-- 轨道设置 -->
+                <div small @click="ui.track = !ui.track">
+                    <svg viewBox="0 0 16 16">
+                        <path d="M14 4.577v6.846L8 15V1l6 3.577zM8.5.134a1 1 0 0 0-1 0l-6 3.577a1 1 0 0 0-.5.866v6.846a1 1 0 0 0 .5.866l6 3.577a1 1 0 0 0 1 0l6-3.577a1 1 0 0 0 .5-.866V4.577a1 1 0 0 0-.5-.866L8.5.134z"/>
+                    </svg>
+                </div>
+
                 <!-- 信息 -->
                 <div @click="ui.about = !ui.about" small>
                     <svg viewBox="0 0 16 16">
                         <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                    </svg>
+                </div>
+
+                <!-- 下一帧 -->
+                <div small @click="player.func.nextFrame()">
+                    <svg viewBox="0 0 16 16">
+                        <path d="m12.14 8.753-5.482 4.796c-.646.566-1.658.106-1.658-.753V3.204a1 1 0 0 1 1.659-.753l5.48 4.796a1 1 0 0 1 0 1.506z"/>
                     </svg>
                 </div>
 
@@ -354,95 +430,118 @@
             </div>
             
         </div>
-        <div class="frame speed" v-show="ui.speed">
+
+        <div class="frame-mask" v-show="ui.about || ui.track || ui.playlist"
+            @click="ui.about = ui.track = ui.playlist = false"
+        ></div>
+
+        <div class="about frame" :display="ui.about">
+            <h1>统计信息</h1>
+            <table v-if="player?.status">
+                <tbody>
+                    <tr>
+                        <td>音频编码</td>
+                        <td>{{ player.status.audiocodec }}</td>
+                    </tr>
+                    <tr>
+                        <td>视频编码</td>
+                        <td>{{ player.status.videocodec }}</td>
+                    </tr>
+                    <tr>
+                        <td>视频大小</td>
+                        <td>{{ player.status.width }} x {{ player.status.height }}</td>
+                    </tr>
+                    <tr>
+                        <td>音频比特率</td>
+                        <td>{{ player.status.audioBitrate }}</td>
+                    </tr>
+                    <tr>
+                        <td>音频声道</td>
+                        <td>{{ player.status.channels }}</td>
+                    </tr>
+                    <tr>
+                        <td>音频采样率</td>
+                        <td>{{ player.status.sampleRate }}</td>
+                    </tr>
+                    <tr>
+                        <td>音频帧率</td>
+                        <td>{{ player.status.audioDecodeFramerate }}</td>
+                    </tr>
+                    <tr>
+                        <td>视频丢包率</td>
+                        <td v-if="player.status.videoPacketCount > 0n">
+                            {{ player.status.videoDropPacketCount / player.status.videoPacketCount * 100n }}%
+                        </td>
+                        <td v-else> 0 </td>
+                    </tr>
+                    <tr>
+                        <td>视频错误率</td>
+                        <td v-if="player.status.videoPacketCount > 0">
+                            {{ player.status.videoDecodeErrorPacketCount / Number(player.status.videoPacketCount) }}
+                        </td>
+                        <td v-else> 0 </td>
+                    </tr>
+                    <tr>
+                        <td>视频比特率</td>
+                        <td>{{ player.status.videoBitrate }}</td>
+                    </tr>
+                    <tr>
+                        <td>视频帧率</td>
+                        <td>{{ player.status.videoRenderFramerate }}</td>
+                    </tr>
+                    <tr>
+                        <td>传输速率</td>
+                        <td>{{ player.status.bandwidth /1000 }} Kbps</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="offcv track" :display="ui.track">
+            <ul v-if="player?.tracks.audio">
+                <h1>音频轨道({{ player.tracks.audio.length }})</h1>
+                <li v-for="item in player.tracks.audio"
+                    :active="item.id == player.tracks.audioTrack"
+                    @click="player.tracks.audioTrack = item.id"
+                >({{ item.id }}) {{ item.metadata.languageString || item.metadata.language }}</li>
+            </ul>
+            <ul v-if="player?.tracks.video">
+                <h1>视频轨道({{ player.tracks.video.length }})</h1>
+                <li v-for="item in player.tracks.video"
+                    :active="item.id == player.tracks.videoTrack"
+                    @click="player.tracks.videoTrack = item.id"
+                >({{ item.id }}) {{ item.metadata.languageString || item.metadata.language }}</li>
+            </ul>
+            <ul v-if="player?.tracks.subtitle">
+                <h1>字幕轨道({{ player.tracks.subtitle.length }})</h1>
+                <div class="subtitle" v-if="player.tracks.subtitle.length" :delay="player.display.subDelay">
+                    <input type="checkbox" v-model="player.display.subtitle" title="显示字幕">
+                    <div class="range" v-if="player.display.subtitle" >
+                        <input title="字幕延迟" min="-5000" max="5000" step="100" type="range" v-model="player.display.subDelay">
+                    </div>
+                    <span v-else>字幕已关闭</span>
+                </div>
+                <li v-for="item in player.tracks.subtitle"
+                    :active="item.id == player.tracks.subTrack"
+                    @click="player.tracks.subTrack = item.id"
+                >({{ item.id }}) {{ item.metadata.languageString || item.metadata.language }}</li>
+            </ul>
+        </div>
+
+        <div class="offcv videos" :display="ui.playlist">
             <h1>播放速度</h1>
             <ul class="select">
+                <li v-speed=".5">0.5x</li>
                 <li v-speed=".75">0.75x</li>
                 <li v-speed="1">1x</li>
                 <li v-speed="1.25">1.25x</li>
                 <li v-speed="1.5">1.5x</li>
                 <li v-speed="2">2x</li>
+                <li v-speed="3">3x</li>
             </ul>
-        </div>
-        <div class="about frame" v-show="ui.about">
-            <h1>统计信息</h1>
-            <table v-if="player?.status">
-                <tr>
-                    <td>音频编码</td>
-                    <td>{{ player.status.audiocodec }}</td>
-                </tr>
-                <tr>
-                    <td>视频编码</td>
-                    <td>{{ player.status.videocodec }}</td>
-                </tr>
-                <tr>
-                    <td>视频大小</td>
-                    <td>{{ player.status.width }} x {{ player.status.height }}</td>
-                </tr>
-                <tr>
-                    <td>音频比特率</td>
-                    <td>{{ player.status.audioBitrate }}</td>
-                </tr>
-                <tr>
-                    <td>音频声道</td>
-                    <td>{{ player.status.channels }}</td>
-                </tr>
-                <tr>
-                    <td>音频采样率</td>
-                    <td>{{ player.status.sampleRate }}</td>
-                </tr>
-                <tr>
-                    <td>音频帧率</td>
-                    <td>{{ player.status.audioDecodeFramerate }}</td>
-                </tr>
-                <tr>
-                    <td>视频丢包率</td>
-                    <td v-if="player.status.videoPacketCount > DEFS[0]">
-                        {{ player.status.videoDropPacketCount / player.status.videoPacketCount * DEFS[100] }}%
-                    </td>
-                    <td v-else> 0 </td>
-                </tr>
-                <tr>
-                    <td>视频错误率</td>
-                    <td v-if="player.status.videoPacketCount > 0">
-                        {{ player.status.videoDecodeErrorPacketCount / Number(player.status.videoPacketCount) }}
-                    </td>
-                    <td v-else> 0 </td>
-                </tr>
-                <tr>
-                    <td>视频比特率</td>
-                    <td>{{ player.status.videoBitrate }}</td>
-                </tr>
-                <tr>
-                    <td>视频帧率</td>
-                    <td>{{ player.status.videoRenderFramerate }}</td>
-                </tr>
-                <tr>
-                    <td>传输速率</td>
-                    <td>{{ player.status.bandwidth /1000 }} Kbps</td>
-                </tr>
-            </table>
-        </div>
-
-        <div class="frame track" v-show="ui.track">
-            <ul class="left" v-if="player?.tracks.audio">
-                <h1>音频轨道({{ player.tracks.audio.length }})</h1>
-                <li v-for="item in player.tracks.audio"
-                    :active="item.index == player.tracks.audioTrack"
-                >{{ item.metadata.language }}</li>
-            </ul>
-            <ul class="right" v-if="player?.tracks.video">
-                <h1>视频轨道({{ player.tracks.video.length }})</h1>
-                <li v-for="item in player.tracks.video"
-                    :active="item.index == player.tracks.videoTrack"
-                >{{ item.metadata.language }}</li>
-            </ul>
-        </div>
-
-        <div class="frame videos" v-show="ui.playlist">
             <h1>播放列表</h1>
             <div>
-                <div :active="ui.videoID == i" v-for="(item,i) in ui.videos">
+                <div :active="ui.videoID == i" v-for="(item,i) in ui.videos" @click="ui.videoID = i">
                     {{ item.name }}
                 </div>
             </div>
@@ -451,11 +550,40 @@
 </template>
 
 <style lang="scss">
+    @import '@/style/input.scss';
+
     .av-container{
         height: 100%;
         background-color: black;
         position: relative;
         user-select: none;
+        
+        >.alert {
+            position: absolute;
+            background-color: rgb(224 247 255 / 40%);
+            padding: 0.5rem 1rem;
+            letter-spacing: .05rem;
+            font-size: 0.8rem;
+            border-radius: 0.3rem;
+            color: white;
+            max-width: 60%;
+            min-width: 10rem;
+            transition: all 0.2s;
+            transform: translateX(100%);
+            bottom: 3rem;
+            right: 0;
+            opacity: 0;
+
+            &[show=true] {
+                right: 1rem;
+                transform: none;
+                opacity: 1;
+            }
+
+            &:active{
+                transform: scale(0.9);
+            }
+        }
 
         > .video{
             height: 100%;
@@ -468,6 +596,13 @@
                 left: 0;
                 height: 100%;
             }
+
+            > *:not(video){
+                pointer-events: none;
+                position: absolute !important;
+                top: 50% !important;left: 50% !important;
+                transform: translate(-50%, -50%);
+            }
         }
 
         > .bar{
@@ -475,26 +610,48 @@
             bottom: 0;
             left: 50%;
             transform: translateX(-50%);
-            padding: .35rem;
+            padding: .2rem;
+            display: flex;
+            gap: .5rem;
 
             width: 90%;
             border-radius: .35rem .35rem 0 0 ;
+            transition: all .2s;
 
-            background-color: rgba(255, 255, 255, 0.9);
+            &[active=false]:not(:hover){
+                transform: translateY(80%) translateX(-50%);
+                opacity: 0;
+            }
 
             > *{
                 display: flex;
                 gap: .35rem;
                 align-items: center;
+
+                padding: .25rem .35rem;
+                border-radius: .25rem;
+                background-color: rgba(100, 100, 100, 0.6);
+                backdrop-filter: blur(.2rem);
+                border: solid .1rem rgba(209, 209, 209, 0.5);
+                color: white;
             }
 
             > .time{
                 font-size: .8rem;
+                min-width: 12rem;
                 display: flex;
+                flex-grow: 1;
+                gap: .75rem;
+                padding: .25rem .5rem;
+                font-family: 'Repair';
 
-                > .total{
-                    color: #615a5a;
+                > *{
+                    min-width: 2rem;
                 }
+
+                // > .total{
+                //     color: #615a5a;
+                // }
 
                 > .timebar{
                     border-radius: 0.25rem;
@@ -504,12 +661,12 @@
                     height: .2rem;
                     transition: all .2s;
                     flex-grow: 1;
-                    min-width: 50%;
+                    flex-shrink: 0;
 
                     &:hover{
                         height: .5rem;
 
-                        > div{
+                        > .prog{
                             min-width: .5rem;
                         }
 
@@ -518,13 +675,14 @@
                         }
                     }
 
-                    > div{
+                    > .prog{
                         border-radius: 0.2rem;
                         min-width: .2rem;
                         height: 100%;
                         transition: all .2s;
                         background-color: rgba(19, 108, 180, 0.5);
                         position: relative;
+                        max-width: 100%;
 
                         &::after{
                             float: right;
@@ -534,8 +692,29 @@
                             height: 1rem;
                             width: 1rem;
                             border-radius: 1rem;
-                            background-color: white;
+                            background-color: rgba(255, 255, 255);
                             border: solid .05rem gray;
+                        }
+                    }
+
+                    > .chapter{
+                        position: absolute;
+                        top: -.4rem;
+                        bottom: 100%;
+                        width: 100%;
+                        overflow: hidden;
+
+                        &::after{
+                            content: '';
+                            display: block;
+                            right: 0;
+                        }
+
+                        > div, &::after{
+                            position: absolute;
+                            border: solid .05rem rgb(184, 184, 184);
+                            border-bottom: none;border-top: none;
+                            height: .25rem;
                         }
                     }
                 }
@@ -549,24 +728,32 @@
                     border-radius: .25rem;
                     transition: all .2s;
 
+                    &[large]{
+                        transform: scale(1.2);
+
+                        > svg{
+                            transform: scale(1.35);
+                        }
+                    }
+
                     > svg{
                         display: block;
-                        width: 1.2rem;
-                        height: 1.2rem;
+                        // width: 1.2rem;
+                        // height: 1.2rem;
                         fill: currentColor;
                         opacity: .7;
-                    }
+                    // }
 
-                    &[small] svg{
+                    // &[small] svg{
                         width: 1rem;
                         height: 1rem;
-                        opacity: .4;
+                        // opacity: .4;
                     }
 
-                    &[large] svg{
-                        width: 1.5rem;
-                        height: 1.5rem;
-                    }
+                    // &[large] svg{
+                    //     width: 1.5rem;
+                    //     height: 1.5rem;
+                    // }
 
                     &:hover{
                         background-color: rgb(175 175 175 / 30%);
@@ -591,6 +778,7 @@
             color: white;
             max-width: 90%;
             box-sizing: border-box;
+            transition: all .2s;
 
             h1{
                 margin: 0;
@@ -601,28 +789,10 @@
                 padding-left: .5rem;
             }
 
-            > .select{
-                padding: 0;
-                display: flex;
-                border-radius: .25rem;
-                overflow: hidden;
-                border: solid .1rem #ffffffb8;
-
-                > *{
-                    padding: .3rem;
-                    flex-grow: 1;
-                    text-align: center;
-                    color: white;
-                    transition: all .2s;
-                    min-width: 3rem;
-                    list-style: none;
-                    user-select: none;
-
-                    &[active=true]{
-                        background-color: #ffffffb8;
-                        color: rgb(66, 62, 62);
-                    }
-                }
+            &[display=false]{
+                transform: rotateX( 90deg );
+                top: -100%;
+                opacity: 0;
             }
         }
 
@@ -655,11 +825,27 @@
             }
         }
 
+        > .offcv{
+            position: absolute;
+            right: 0;
+            top: 0;
+            z-index: 5;
+            background-color: rgb(255 255 255 / 60%);
+            width: 80%;
+            padding: 2rem;
+            box-sizing: border-box;
+            height: 100%;
+            backdrop-filter: blur(.35rem);
+            max-width: 20rem;
+            transition: all .2s;
+
+            &[display=false]{
+                transform: translateX( 120% );
+                opacity: 0;
+            }
+        }
+
         > .track{
-            display: flex;
-            width: 20rem;
-            max-width: 90vw;
-            gap: 1rem;
 
             h1{
                 font-size: 1.25rem;
@@ -670,12 +856,86 @@
                 margin: 0;
                 padding: 0;
                 flex-grow: 1;
+                min-width: 10rem;
+
+                > div.subtitle{
+                    display: flex;
+                    align-items: center;
+                    gap: .5rem;
+                    font-size: .9rem;
+                    margin-bottom: .5rem;
+
+                    >input[type=checkbox]{
+                        @include v-checkbox;
+                    }
+
+                    > .range{
+                        position: relative;
+                        flex-grow: 1;
+                        height: 1.5rem;
+
+                        // 悬浮在左侧的提示框
+                        &::after{
+                            content: '偏移 ' attr(delay) 'ms';
+                            position: absolute;
+                            top: 0;
+                            right: 105%;
+                            background-color: rgba(128, 128, 128, 0.5);
+                            color: white;
+                            padding: .2rem .5rem;
+                            border-radius: .2rem;
+                            opacity: 0;
+                            transition: all .2s;
+                            transform: translateX(100%);
+                            white-space: nowrap;
+                            z-index: 1;
+                        }
+
+                        &:hover::after{
+                            transition-delay: 1s;
+                            transform: translateX(0);
+                            opacity: 1;
+                        }
+
+                        // 在中侧的提示
+                        &::before{
+                            content: '';
+                            width: .1rem;
+                            height: 100%;
+                            background-color: rgb(188, 188, 188);
+                            position: absolute;
+                            top: 0;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            z-index: -1;
+                        }
+                    
+                        > input[type=range]{
+                            font-size: 1rem;
+                            position: absolute;
+                            top: 50%;
+                            transform: translateY(-50%);
+                            left: 0;
+                            width: 100%;
+                            box-sizing: border-box;
+                            @include v-winui-range;
+                        }
+                    }
+
+                    > span{
+                        flex-grow: 1;
+                    }
+                }
 
                 > li{
                     list-style: none;
                     font-size: .85rem;
                     padding: .25rem .5rem;
                     position: relative;
+
+                    &:hover{
+                        background-color: #ffffff30
+                    }
 
                     &[active=true]{
                         @include hover();
@@ -688,6 +948,31 @@
             overflow-y: auto;
             font-size: .8rem;
             overflow: hidden;
+
+            > .select{
+                padding: 0;
+                display: flex;
+                flex-wrap: wrap;
+                border-radius: .25rem;
+                overflow: hidden;
+                border: solid .1rem #756e6eb8;
+
+                > *{
+                    padding: .3rem;
+                    flex-grow: 1;
+                    text-align: center;
+                    color: rgb(90, 87, 87);
+                    transition: all .2s;
+                    min-width: 3rem;
+                    list-style: none;
+                    user-select: none;
+
+                    &[active=true]{
+                        background-color: #c9c5c5b8;
+                        color: rgb(66, 62, 62);
+                    }
+                }
+            }
 
             > div{
                 overflow-y: auto;
@@ -712,6 +997,14 @@
                     }
                 }
             }
+        }
+
+        > .frame-mask{
+            position: absolute;
+            inset: 0;
+            backdrop-filter: blur(.2rem);
+            background-color: rgb(255 255 255 / 60%);
+            z-index: 2;
         }
     }
 </style>

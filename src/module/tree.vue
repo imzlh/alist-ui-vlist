@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { MessageOpinion, vDir, vFile, FileOrDir } from '@/env';
-    import { DEFAULT_FILE_ICON, FS, Global, UI, openFile, size2str, splitPath, clearActiveFile, getActiveFile } from '@/utils';
-    import { type PropType } from 'vue';
+    import { DEFAULT_FILE_ICON, FS, UI, openFile, size2str, splitPath, clearActiveFile, getActiveFile, message } from '@/utils';
+    import { nextTick, type PropType } from 'vue';
     import { TREE_REG } from '@/action/tree';
 
     // DRAG的口令，用于鉴别
@@ -44,7 +44,8 @@
                     const text = el.value,
                         pos_end = text.lastIndexOf('.');
                     // 选中.前内容
-                    el.focus();el.setSelectionRange(0, pos_end);
+                    nextTick(() => requestAnimationFrame(() => el.focus()));
+                    el.setSelectionRange(0, pos_end)
                 }
             },
             into: {
@@ -57,6 +58,7 @@
                                 'block': 'center'
                             });
                         el.classList.add('selected');
+                        requestAnimationFrame(() => el.focus());
                     }else{
                         el.classList.remove('selected');
                     }
@@ -133,7 +135,7 @@
                             enabled.push(from_fd.path);
                     }
                     FS.move(enabled, to_fd.path)
-                        .catch(e => Global('ui.message').call({
+                        .catch(e => message({
                             "title": "资源管理器",
                             "content": {
                                 "title": "移动错误",
@@ -191,7 +193,7 @@
                     dir.lock = dir.unfold = true;
                     // 异步加载子项目
                     FS.loadTree(dir as any)
-                        .then(() => dir.lock = false);
+                        .then(() => dir.lock = !(dir.unfold = true));
                 }
             },
             /**
@@ -202,7 +204,7 @@
             rename(file: FileOrDir, val: string){
                 FS.rename({
                     [file.path]: splitPath(file).dir + val
-                }).catch((e: Error) => (Global('ui.message').call({
+                }).catch((e: Error) => (message({
                     'type': 'error',
                     'content': {
                         'title': '删除失败',
@@ -237,7 +239,7 @@
 </script>
 
 <template>
-    <div class="parent selectable" ref="parent"
+    <div class="parent" ref="parent" v-bind="$attrs"
         :style="{ pointerEvents: data.lock ? 'none' : 'all' }"
         @dblclick.stop="folder()" @click.stop="markup($event, data)" @contextmenu.stop.prevent="ctxmenu(data, $event)"
         @dragstart.stop="drag_start($event, data)" :draggable="(data).path != '/' && !(data as vDir).rename" @drop.stop="drag_onto($event, data)"
@@ -246,13 +248,13 @@
         v-touch
         v-into="data.parent && data.parent.active.has(data)" tabindex="-1"
     >
-        <div class="btn-hide" :show="data.unfold" @click.stop="folder()"></div>
+        <div class="btn-hide" :show="data.unfold" @click="folder()"></div>
         <img :src="data.icon" v-if="data.icon">
         <input v-if="data.rename" :value="data.name"
             @change="rename(data, ($event.currentTarget as HTMLInputElement).value)"
             @contextmenu="(data as vDir).rename = false"
             @blur="(data as vDir).rename = false"
-            @keydown.stop @drop.stop.prevent
+            @keydown.stop @drop.stop.prevent @click.stop @keyup.stop @dblclick.stop
             v-focus
         >
         <span class="text" v-else>{{ data.dispName || data.name }}</span>
@@ -262,26 +264,26 @@
         @contextmenu.stop.prevent="ctxmenu(data, $event)"
         @dragover.stop="drag_alert($event, data)" @drop.stop="drag_onto($event, data)"
         @dragleave.stop="($event.currentTarget as HTMLElement).classList.remove('moving')"
-        @click.stop="data.active = new Map()"
+        @click="data.active = new Map()"
     >
-        <template v-for="child in data.child" :key="child.name">
+        <template v-for="(child, id) in data.child" :key="child.path">
 
-            <tree v-if="child.type == 'dir'" :data="child" />
+            <tree v-if="child.type == 'dir'" :data="child" :data-position="data.path + ':' + id" />
 
-            <div v-else class="item selectable" :title="desc(child)" ref="elements"
+            <div v-else class="item" :title="desc(child)" ref="elements"
                 @click.stop="markup($event, child)" @contextmenu.stop.prevent="ctxmenu(child, $event)"
-                v-touch
+                v-touch 
                 @dblclick.stop="openFile(child as vFile)" @dragstart.stop="drag_start($event, child)" :draggable="!(child as vFile).rename"
                 v-into="data.active.has(child)" :process="child.upload"
                 :style="{ '--status': child.upload || 0, pointerEvents: child.lock ? 'none' : 'all' }"
-                :type="child.type" tabindex="-1"
+                tabindex="-1" :data-position="data.path + ':' + id"
             >
                 <img :src="child.icon || DEFAULT_FILE_ICON">
                 <input v-if="(child as vFile).rename" :value="child.name"
                     @change="rename(child, ($event.currentTarget as HTMLInputElement).value)"
                     @contextmenu="(child as vFile).rename = false"
                     @blur="(child as vFile).rename = false"
-                    @keydown.stop @drop.stop.prevent
+                    @keydown.stop @drop.stop.prevent @click.stop @keyup.stop @dblclick.stop
                     v-focus
                 >
                 <span class="text" v-else>{{ child.dispName || child.name }}</span>
@@ -302,6 +304,8 @@
             outline: none;
             border-radius: .15rem;
             background-color: #ffffffb5;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .moving{
@@ -341,7 +345,7 @@
                 background-color: rgba(114, 140, 255, 0.5);
             }
 
-            &[type=file]{
+            &.item{
                 padding-left: 1rem;
             }
 

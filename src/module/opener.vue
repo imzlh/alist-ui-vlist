@@ -1,54 +1,92 @@
-<script setup lang="ts">
-    import type { vFile } from '@/env';
-    import { Global, splitPath } from '@/utils';
+<script lang="ts">
+    import type { OpenerOption, vFile } from '@/env';
+    import { splitPath } from '@/utils';
     import { reactive } from 'vue';
-    import { OPENER } from '@/opener';
+    import { OPENER, USER_PREFERRENCE } from '@/opener';
 
     const cfg = reactive({
         ext: '',
         display: false,
-        opener: OPENER,
+        default: '',
+        setDefault: false,
         selected: -1
     });
 
     let callback:undefined|Function;
 
-    Global('opener.choose').data = function(file:vFile) {
+    export function selectOpener(file:vFile) {
         cfg.display = true;
-        cfg.ext = splitPath(file)['ext'];
-        return new Promise(rs => callback = rs);
+        cfg.ext = splitPath(file)['ext'].toLowerCase();
+        cfg.default = cfg.ext in USER_PREFERRENCE ? USER_PREFERRENCE[cfg.ext] : '';
+        cfg.setDefault = !!cfg.default;
+        cfg.selected = cfg.default? OPENER.findIndex(opener => opener.name == cfg.default): -1;
+        return new Promise<OpenerOption>(rs => callback = rs);
+    }
+
+
+</script>
+
+<script lang="ts" setup>
+    function submit(){
+        callback && callback(OPENER[cfg.selected]);
+        cfg.display = false;
+
+        if(cfg.setDefault)
+            USER_PREFERRENCE[cfg.ext] = OPENER[cfg.selected].name;
     }
 </script>
 
 <template>
-    <div :class="['opener-chooser',{display: cfg.display}]">
+    <div class="opener-chooser" v-if="cfg.display">
         <h3>你要如何打开 <b>{{ cfg.ext }}</b> ?</h3>
         <div class="list">
-            <div v-for="(opener,i) in cfg.opener"
-                @click.stop="cfg.selected = i" @dblclick="
-                    () => {callback && callback(OPENER[cfg.selected]);cfg.display = false;}
-                "
-                :selected="i == cfg.selected"
-            >
-                <img :src="opener.icon || '/images/icon/app.webp'">
-                <div>
-                    <h4>{{ opener.name }}</h4>
-                    <span >{{ opener.typeDesc }}</span>
+            <template v-if="cfg.default" v-for="(opener,i) in OPENER">
+                <div v-if="opener.name == cfg.default"
+                    @click.stop="cfg.selected = i" @dblclick="submit"
+                    :selected="i == cfg.selected"
+                >
+                    <img :src="opener.icon || '/images/icon/app.webp'">
+                    <div>
+                        <h4><span>默认</span>{{ opener.name }}</h4>
+                        <span >{{ opener.typeDesc }}</span>
+                    </div>
                 </div>
-            </div>
+            </template>
+
+            <template v-for="(opener,i) in OPENER">
+                <div v-if="opener.name != cfg.default"
+                    @click.stop="cfg.selected = i" @dblclick="submit"
+                    :selected="i == cfg.selected"
+                >
+                    <img :src="opener.icon || '/images/icon/app.webp'">
+                    <div>
+                        <h4>{{ opener.name }}</h4>
+                        <span >{{ opener.typeDesc }}</span>
+                    </div>
+                </div>
+            </template>
+            
         </div>
+
+        <div class="set-default">
+            <input type="checkbox" v-model="cfg.setDefault">
+            <span>设置为默认打开方式</span>
+        </div>
+
         <div class="btns" style="flex-direction: row-reverse;">
             <button @click="cfg.display = false;cfg.selected = -1;">取消</button>
-            <button :disabled="-1 === cfg.selected" @click="callback && callback(OPENER[cfg.selected]);cfg.display = false;">确定</button>
+            <button :disabled="-1 === cfg.selected" @click="submit">确定</button>
         </div>
     </div>
     <div class="opener-cover" @click="cfg.display = false" v-show="cfg.display"></div>
 </template>
 
 <style lang="scss">
+    @import '@/style/input.scss';
+
     .opener-chooser{
         position: fixed;
-        top: -100vh;
+        top: 50%;
         left: 50%;
         width: 100vw;
         max-width: 20rem;
@@ -59,13 +97,15 @@
         transform: translate(-50%,-50%);
         transition-timing-function: ease-out;
         opacity: 0;
-        transition: opacity .2s,translate .35s;
+        animation: show 0.3s ease-out forwards;
 
-        &.display{
-            display: block;
-            opacity: 1;
-            top: 50vh;
-            transition-timing-function: ease-in;
+        @keyframes show{
+            from{
+                opacity: 0;
+            }
+            to{
+                opacity: 1;
+            }
         }
 
         > h3{
@@ -73,14 +113,29 @@
             font-weight: 500;
         }
 
-        .list{
-            overflow-y: auto;
+        > .set-default{
+            padding: 0 1rem;
+            font-size: .76rem;
+            color: #9e8b8b;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            user-select: none;
+
+            > input{
+                @include v-winui-checkbox;
+            }
+        }
+
+        > .list{
+            overflow-y: scroll;
             overflow-x: hidden;
             max-height: 12rem;
             height: calc(100vh - 10rem);
             margin: .75rem;
             background-color: white;
             border-radius: .3rem;
+            padding: .2rem 0 .2rem .2rem;
 
             > div{
                 padding: .45rem;
@@ -109,9 +164,21 @@
                 }
 
                 > div{
+                    user-select: none;
+
                     > h4{
                         margin: .1rem;
                         font-size: .9rem;
+
+                        > span{
+                            font-weight: 400;
+                            padding: .1em .35em;
+                            background-color: #21c932;
+                            color: white;
+                            border-radius: .2em;
+                            font-size: .8rem;
+                            margin-right: .25em;
+                        }
                     }
 
                     > span{

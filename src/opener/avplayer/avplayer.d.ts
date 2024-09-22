@@ -56,14 +56,43 @@ export default class Stat {
     lastVideoMuxDts: bigint
 }
 
+export interface Chapter{
+    /**
+     * unique ID to identify the chapter
+     */
+    id: bigint;
+    /**
+     * time base in which the start/end timestamps are specified
+     */
+    time_base: {
+        num: number,
+        den: number
+    };
+    /**
+     * chapter start/end time in time_base units
+     */
+    start?: bigint;
+    end?: bigint;
+    /**
+     * (pointer)
+     */
+    metadata: number;
+}
+
+export interface Subtitle {
+    source: string | File
+    lang?: string
+    title?: string
+}
+
 export interface Export {
     url: string,
     playBackRate: number,
     loop: boolean,
     volume: number,
     time: {
-        total: number,
-        current: number
+        total: bigint,
+        current: bigint
     },
     tracks: {
         audio: Array<Stream>,
@@ -71,9 +100,9 @@ export interface Export {
         video: Array<Stream>,
         videoTrack: number,
         subtitle: Array<Stream>,
-        subTrack: number
+        subTrack: number,
+        chapter: Array<Chapter>
     },
-    ended: boolean,
     play: boolean,
     stop: boolean,
     destroy: () => void,
@@ -84,12 +113,16 @@ export interface Export {
         flip: {
             vertical: boolean,
             horizontal: boolean
-        }
+        },
+        subDelay: number,
+        subtitle: true
     },
     func: {
         snapshot: (type?: string) => void,
-        seek: (time: number) => void,
-        resize: [number, number]
+        seek: (time: bigint) => void,
+        resize(): void,
+        extSub: (source: Subtitle) => Promise<Stream>,
+        nextFrame: () => void
     }
 }
 
@@ -100,10 +133,27 @@ export interface Stream {
     duration: bigint,
     id: number
     index: number,
-    metadata: { language: string } & Record<string, string>
+    metadata: { language: number, languageString?: string } & Record<string, string>
     nbFrames: bigint,
     startTime: bigint
-    timeBase: bigint
+    timeBase: bigint,
+    codecparProxy: Record<string, bigint | string | number>,
+    mediaType: 'Audio' | 'Video' | 'Subtitle' | 'Attachment' | 'Data'
 }
 
-export default function (el: HTMLDivElement): Export;
+/**
+ * 额外支持的DOM事件
+ */
+export type Events = 'ended' | 'waiting' | 'load' | 'play' | 'pause' |'seeking' |'seeked' | 'time' | 'progress';
+
+/**
+ * progress事件的参数
+ */
+export enum AVState {
+    OPEN_FILE,
+    ANALYZE_FILE,
+    LOAD_AUDIO_DECODER,
+    LOAD_VIDEO_DECODER
+}
+
+export default function (el: HTMLDivElement): Promise<Export>;

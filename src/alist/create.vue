@@ -1,8 +1,7 @@
 <script lang="ts" setup>
     import AList, { Alist_Order_by, type AList_Driver_Config_Item, type Alist_Driver_Create_Param } from './alist';
-    import { reactive, ref, shallowReactive, watch } from 'vue';
+    import { ref, shallowReactive, watch } from 'vue';
     import { _N, _T } from './translate';
-import { Global } from '@/utils';
 
     const STEP_TITLES = [
         "欢迎",
@@ -68,7 +67,7 @@ import { Global } from '@/utils';
                 CFG.STEP = 3;
                 setTimeout(() => ev('close'), 3000);
             })
-            .catch(e => Global('ui.message').call({
+            .catch(e => postMessage({
                 "type": "error",
                 "timeout": 10,
                 "title": "aListMGR",

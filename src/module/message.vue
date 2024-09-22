@@ -1,23 +1,25 @@
-<script setup lang="ts">
+<script lang="ts">
     import type { MessageOpinion } from '@/env';
-    import { Global } from '@/utils';
     import { nextTick, reactive } from 'vue';
 
     const message = reactive<Array<MessageOpinion & { uuid: string }>>([]);
 
-    function postMessage(msg: MessageOpinion) {
+    export function create(msg: MessageOpinion) {
         const i = message.push({
             ...msg,
             uuid: Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36)
         }) - 1;
         if (msg.timeout) setTimeout(() => message.splice(i, 1), msg.timeout * 1000);
+        return i;
     }
-    function msg_destroy(i: number) {
+    export function remove(i: number) {
         message[i].hidden = true;
         nextTick(() => setTimeout(() => message.splice(i, 1), 200));
     }
+</script>
 
-    Global('ui.message').data = postMessage;
+<script lang="ts" setup>
+    const msg_destroy = remove;
 </script>
 
 <template>
@@ -46,7 +48,7 @@
 </template>
 
 <style lang="scss">
-    @import '@/icon.scss';
+    @import '@/style/icon.scss';
 
     .messages {
         // overflow: hidden;
@@ -83,7 +85,7 @@
             >header {
                 display: flex;
                 height: 1.5em;
-                gap: .75em;
+                gap: .3em;
                 line-height: 1.5em;
                 padding: .25rem .75rem;
                 color: #7c7a7a;
@@ -93,7 +95,6 @@
                     content: $icon_right;
                     opacity: .2;
                     width: 1.2em;
-                    cursor: pointer;
 
                     &:hover {
                         opacity: .8;
@@ -149,48 +150,13 @@
                     flex-grow: 1;
 
                     > span {
-                        line-height: 1.45em;
-                        font-size: .9rem;
+                        font-size: .8rem;
                         color: #575252;
-
-                        h1,h2,h3 {
-                            &::before{
-                                margin-right: .5em;
-                                display: inline-block;
-                                content: '#';
-                                color: #38cbce;
-                            }
-                        }
-
-                        h4,h5,h6{
-                            border-left: solid .35rem #4ff5f9;
-                            padding-left: .5em;
-                        }
-
-                        p {
-                            text-indent: 1em;
-                            font-size: .9em;
-                        }
-                        
-                        a{
-                            text-decoration: none;
-                            border-bottom: dotted .1rem #bbbbbb;
-                            color: inherit;
-
-                            &:hover{
-                                color: black;
-                            }
-                        }
-
-                        > *{
-                            line-height: 1rem;
-                            margin: 0;
-                        }
                     }
 
                     > h3 {
                         margin: 0;
-                        line-height: 1.2rem;
+                        line-height: 1.5rem;
                         font-size: 1rem;
                     }
                 }

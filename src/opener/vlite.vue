@@ -1,10 +1,10 @@
 <script setup lang="ts">
     import type { vFile } from '@/env';
     import { regSelf } from '@/opener';
-    import parseCue from '@/utils/cue';
-    import { acceptDrag, FILE_PROXY_SERVER, FS, Global, splitPath } from '@/utils';
+    import parseCue from './media/cue';
+    import { acceptDrag, FILE_PROXY_SERVER, FS, message, splitPath } from '@/utils';
     import { Lrc, Runner, type Lyric } from 'lrc-kit';
-    import MediaSession, { updateMediaSession } from '@/utils/mediaSession';
+    import MediaSession, { updateMediaSession } from './media/mediaSession';
     import { computed, nextTick, onMounted, onUnmounted, ref, shallowReactive, watch } from 'vue';
 
     interface Music {
@@ -95,7 +95,7 @@
         // 加载歌词
         if(info.ext.toLowerCase() == 'lrc'){
             const fe = await fetch(file.url);
-            if(!fe.ok) return Global('ui.message').call({
+            if(!fe.ok) return message({
                 "type": "error",
                 "title": "vLite",
                 "content":{
@@ -139,6 +139,8 @@
 
     // 监听曲目变化
     watch(current, (item, old) => {
+        if(!item) return;
+        
         // 刷新播放状态
         CFG.playing = false;
         CFG.totalTime = '-:-';
@@ -223,7 +225,7 @@
                 if(!fe.ok) throw 'e';
                 var res = Lrc.parse(await fe.text());
             }catch{
-                return Global('ui.message').call({
+                return message({
                     "type": "error",
                     "title": "vLite",
                     "content":{
@@ -277,7 +279,7 @@
         }
         // 更新时间
         CFG.currentTime = time2str(
-            current.value.start == undefined
+            current.value?.start == undefined
                 ? audio.currentTime
                 : audio.currentTime - current.value.start
         );
@@ -291,7 +293,7 @@
         CFG.playing = true;
     }
     audio.onvolumechange = () => CFG.volume = audio.volume;
-    audio.onerror = () => Global('ui.message').call({
+    audio.onerror = () => message({
         "type": "error",
         "title": "vLite",
         "content":{
@@ -314,7 +316,6 @@
     audio.oncanplay = () => audio.play();
 
     function keyev(kbd:KeyboardEvent){
-        kbd.preventDefault();kbd.stopPropagation();
         switch(kbd.key){
             case 'ArrowRight':
                 audio.currentTime += CONFIG.seek_time;
@@ -336,7 +337,11 @@
             case 'Enter':
                 audio.paused ? audio.play() : audio.pause();
             break;
+
+            default:
+                return
         }
+        kbd.preventDefault();kbd.stopPropagation();
     }
 
     function switchMode(){
@@ -359,6 +364,9 @@
 
     let cur_dir = '';
     async function play(file: vFile) {
+        // 暂停
+        audio.pause();
+        CFG.currentID = -1;
         const dir = splitPath(file)['dir'];
         let id: number | undefined;
         if (cur_dir == dir) {
@@ -439,7 +447,7 @@
         }
 
         if (id !== undefined) CFG.currentID = id;
-        else Global('ui.message').call({
+        else message({
             "type": "error",
             "title": "vLite",
             "content": {
@@ -623,10 +631,10 @@
                 > .cover{
                     flex-grow: 1;
                     padding-top: 100%;
+                    background-image: linear-gradient(60deg, #3c9ea4, #cfe9bc);
                     background-position: center;
                     background-size: cover;
                     background-repeat: no-repeat;
-                    background-color: #ffffffad;
                     border-radius: .3rem;
                 }
 

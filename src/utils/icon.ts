@@ -924,7 +924,7 @@ const folderIcon: FolderIcon[] = [
     },
     { name: 'folder-bicep', folderNames: ['bicep'] },
 ],fileIcon: Array<FileIcons> = [
-    { name: 'html', fileExtensions: ['htm', 'xhtml', 'html_vm', 'asp'] },
+    { name: 'html', fileExtensions: ['htm', 'xhtml', 'html_vm', 'asp', 'html'] },
     {
         name: 'pug',
         fileExtensions: ['jade', 'pug'],
@@ -1068,6 +1068,7 @@ const folderIcon: FolderIcon[] = [
             'pgm',
             'pnm',
             'icns',
+            'tldb'
         ],
     },
     { name: 'javascript', fileExtensions: ['esx', 'mjs', 'js'] },
@@ -1210,6 +1211,12 @@ const folderIcon: FolderIcon[] = [
             'vcxproj',
             'vcxproj.filters',
         ],
+    },{
+        "name": "vdb",
+        "fileExtensions": [
+            "vdb",
+            "vtc"
+        ]
     },
     {
         name: 'database',
@@ -1579,8 +1586,12 @@ const folderIcon: FolderIcon[] = [
     { name: 'coffee', fileExtensions: ['coffee', 'cson', 'iced'] },
     {
         name: 'document', fileExtensions: [
-            'txt', 'ass', 'vtt'
+            'txt', 'ass', 'vtt', 'srt', 'ssa'
         ]
+    },{
+        name: 'epub', fileExtensions: ['epub']
+    },{
+        name: 'cast', fileExtensions: ['cast']
     },
     {
         name: 'graphql',
@@ -3261,21 +3272,31 @@ export function getIcon(name: string, is_file = true){
             const element = fileIcon[i];
             
             if(element.fileNames?.includes(name.toLowerCase()))
-                full_match = APP_ROOT + `images/type/${element.name}.svg`;
+                full_match = APP_ROOT + `/images/type/${element.name}.svg`;
 
             else if(element.fileExtensions?.includes(ext))
-                ext_match =  APP_ROOT + `images/type/${element.name}.svg`;
+                ext_match =  APP_ROOT + `/images/type/${element.name}.svg`;
 
             else for (const key in element.patterns)
                 if(name.startsWith(key) && enumatch[(element.patterns as any)[key]].includes(ext))
-                    half_match =  APP_ROOT + `images/type/${element.name}.svg`;
+                    half_match =  APP_ROOT + `/images/type/${element.name}.svg`;
         }
 
         return full_match || half_match || ext_match || I_File;
     }else{
         for (let i = 0; i < folderIcon.length; i++)
             if(folderIcon[i].folderNames.includes(name))
-                return  APP_ROOT + `images/type/${folderIcon[i].name}.svg`;
+                return  APP_ROOT + `/images/type/${folderIcon[i].name}.svg`;
         return I_DIR;
+    }
+}
+
+export function register(type: 'file', icon: FileIcons): void;
+export function register(type: 'folder', icon: FolderIcon): void;
+export function register(type: string, icon: any){
+    if(type == 'file'){
+        fileIcon.unshift(icon);
+    }else if(type == 'folder'){
+        folderIcon.unshift(icon);
     }
 }

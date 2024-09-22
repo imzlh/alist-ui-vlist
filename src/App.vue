@@ -1,88 +1,142 @@
 <script setup lang="ts">
-	import { computed, onMounted, reactive, readonly, ref, watch, type Ref } from 'vue';
-	import type { AlertOpts, CtxDispOpts, CtxMenuData } from './env';
+	import { computed, nextTick, reactive, ref, shallowRef, watch, type Ref } from 'vue';
+	import type { CtxDispOpts, CtxMenuData, FileOrDir, vDir } from './env';
 	import tabManager from './module/tabs.vue';
 	import CtxMenu from './module/ctxmenu.vue';
-	import { FS, Global, TREE, getActiveFile, getConfig, regConfig, splitPath } from './utils';
+	import { FACTION, FS, TREE, getActiveFile, getConfig, message, openFile, regConfig, registerCommand } from './utils';
 	import Opener from './module/opener.vue';
 	import Message from './module/message.vue';
-	import Chooser from './module/fileframe.vue';
+	import Chooser from './module/fdpicker.vue';
 	import Alert from './module/alert.vue';
 	import Tree from './module/tree.vue';
+	import Command from './module/panel.vue';
 
-	const ctxconfig = reactive({
-			item: [] as Array<CtxMenuData>,
-			display: false,
-			x: 0,
-			y: 0
-		}),
-		list_ele = ref<HTMLElement>();
-
-	// 键盘事件管理器
-	const KeyBoardManager = {
-		/**
-		 * @private
-		 */
-		current: 0,
-		/**
-		 * @private
-		 */
-		elements: computed(() => (list_ele.value as HTMLElement).getElementsByClassName('selectable')),
-
-		get next(){
-			if(this.current == this.elements.value.length-1)
-				this.current = 0;
-			else
-				this.current ++;
-			return this.elements.value[this.current] as HTMLElement;
-		},
-		get prev(){
-			if(this.current == 0)
-				this.current = this.elements.value.length -1;
-			else
-				this.current --;
-			return this.elements.value[this.current] as HTMLElement;
-		},
-		_ensure(action: string):Promise<any>{
-			return new Promise(rs => Global('ui.alert').call({
-				"callback": res => res && rs(true),
-				"message": "真的要" + action + '吗?',
-				"title": "确认操作",
-				"type": "confirm"
-			} satisfies AlertOpts));
-		},
-		__handler(e: KeyboardEvent){
-			e.preventDefault();
-
-			switch (e.key) {
-				case 'ArrowDown':
-					this.next.click();
-				break;
-
-				case 'ArrowUp':
-					this.prev.click();
-				break;
-
-				case 'Enter':
-					this.elements.value[this.current].dispatchEvent(new MouseEvent('dblclick'));
-				break;
-
-				case 'Delete':
-					const marked = getActiveFile();
-					this._ensure('删除 ' + marked.length + '个文件(夹)')
-						.then(() => {
-							FS.delete(marked.map(item => item.path));
-						});
-				break;
-
-				default:
-					break;
-			}
-		}
-	}
-
-	watch(list_ele, el => el && el.addEventListener('keydown', e => KeyBoardManager.__handler(e)));
+	const list_ele = ref<HTMLElement>();
 	window.addEventListener('resize', () => layout_displayLeft.value = false);
+
+	// 键盘监听
+	let current_tree = TREE.parent!,
+		current_index = 0,
+		old_fd: undefined | FileOrDir,
+		current: FileOrDir = current_tree.child![current_index],
+		locked = false;
+	async function handleUpdate(multi = false){
+		old_fd = current;
+		multi || (old_fd && old_fd.parent?.active.delete(old_fd));
+		locked = UI.loading = true;
+		if(!current_tree.child) document.documentElement.focus(), await FS.loadTree(current_tree);
+		else if(current_tree.child.length == 0) return;
+		current_tree.unfold = true;
+		locked = UI.loading = false;
+		current = current_tree.child![current_index];
+		if(!current) current_index = 0, current = current_tree.child![current_index];
+		current.parent?.active.set(current, current.path);
+	}
+	watch(list_ele, ele => ele && (ele.addEventListener('keydown', (ev:KeyboardEvent) => {
+		if((ev.target as HTMLElement).tagName == 'INPUT') return;
+		if(locked) return;
+
+		if(ev.ctrlKey) switch(ev.key){
+			case 'keyA':
+				if(!current.parent) return;
+				current.parent.child?.forEach(child => current.parent?.active.set(child, child.path));
+			break;
+
+			case 'keyC':
+				FACTION.mark('copy');
+			break;
+
+			case 'keyX':
+				FACTION.mark('move');
+			break;
+
+			case 'keyV':
+				let dir = current.type == 'dir' ? current : current.parent;
+				if(dir) FACTION.exec(dir);
+			break;
+
+			default:
+				return;
+		}
+		
+		switch(ev.key){
+			case 'ArrowUp':
+				current_index = Math.max(0, current_index - 1);
+				handleUpdate(ev.shiftKey);
+			break;
+				
+			case 'ArrowDown':
+				current_index = current_index >= current_tree.child!.length - 1 ? 0 : current_index + 1;
+				handleUpdate(ev.shiftKey);	
+			break;
+
+			case 'Enter':{
+				const cur = current;
+				cur.type == 'dir'
+					? FS.loadTree(cur).then(() => cur.unfold = true)
+					: openFile(cur);
+			break; }
+
+			case 'Tab':
+			case 'ArrowRight':
+				if(current.type == 'dir')
+					current_tree = current,
+					current_index = 0;
+				handleUpdate(ev.shiftKey);
+			break;
+
+			case 'ArrowLeft':
+			case 'Escape':
+				if(current_tree.parent && current_tree.path != '/')
+					current_index = current_tree.parent.child!.indexOf(current_tree),
+					current_tree = current_tree.parent;
+				handleUpdate(ev.shiftKey);
+			break;
+
+			case 'F5':{
+				const cur = current;
+				if(cur.type == 'file' && cur.parent?.type == 'dir')
+					FS.loadTree(cur.parent).then(() => cur!.parent!.unfold = true);
+				else if(cur.type == 'dir')
+					FS.loadTree(cur).then(() => cur!.unfold = true);
+				handleUpdate(ev.shiftKey);
+			break; }
+
+			case 'F2':
+				if(current.path != '/')
+					current.rename = true;
+			break;
+
+			case 'Delete':
+				if(current.path != '/')
+					FS.del(getActiveFile()[0].path).catch(e => message({
+						'type': 'error',
+						'content': {
+							'title': '删除失败',
+							'content': (e as Error).message
+						},
+						'title': '文件资源管理器',
+						'timeout': 10
+					})).then(() => handleUpdate(ev.shiftKey));
+			break;
+
+			default: return;
+		}
+
+		ev.preventDefault();
+	}), ele.addEventListener('pointerup', async e => {
+		if((e.target as HTMLElement).tagName == 'INPUT') return;
+		if(locked) return;
+		const target = e.target as HTMLElement;
+		// 切换活动ID
+		if((target.classList.contains('item') || target.classList.contains('parent')) && target.dataset.position){
+			const index = target.dataset.position.lastIndexOf(':'),
+				tree = await FS.stat(target.dataset.position!.substring(0, index)),
+				id = parseInt(target.dataset.position.substring(index + 1));
+			current_tree = tree.type == 'dir' ? tree : tree.parent!, 
+			current_index = id, handleUpdate(true);
+		}
+	})));
 
 	const tree_active = ref(false),
 		layout_displayLeft = ref(false),
@@ -90,13 +144,6 @@
 
 	watch(UIMAIN['layout.fontSize'], val => document.documentElement.style.fontSize = val + 'px');
 	document.documentElement.style.fontSize = UIMAIN['layout.fontSize'].value + 'px';
-
-	Global('ui.ctxmenu').data = function(data:CtxDispOpts){
-		ctxconfig.x = data.pos_x;
-		ctxconfig.y = data.pos_y;
-		ctxconfig.item = data.content;
-		ctxconfig.display = true;
-	}
 
 	function resize(e:PointerEvent){
 		const rawW = UI.filelist_width.value;
@@ -117,9 +164,22 @@
 
 	function handleAppClick(el: MouseEvent){
 		const target = el.target as HTMLElement;
-		if(target.classList.contains('app-meta-header') && taskmode.value)
-			taskmode.value = false
+		if((target.classList.contains('app-meta-header') || target.classList.contains('default_app')) && taskmode.value)
+			taskmode.value = false;
 	}
+
+	nextTick(() => registerCommand({
+		"name": "list.focus",
+		"title": "聚焦到文件列表",
+		"handler": () => list_ele.value!.focus()
+	}, {
+		"name": "app.fullscreen",
+		"title": "切换全屏模式",
+		handler: () => UI.fullscreen.value ? document.exitFullscreen() : reqFullscreen()
+	}))
+	
+	// 自动聚焦
+	window.addEventListener('load', () => requestAnimationFrame(() => list_ele.value?.focus()));
 </script>
 
 <script lang="ts">
@@ -144,7 +204,7 @@
 		'个性化',
 		{
 			"type": "text",
-			"default": "izCloud",
+			"default": "vList",
 			"key": "appname",
 			"name": "应用名称",
 			"desc": "在左上角显示的应用名称"
@@ -183,15 +243,34 @@
 			: size_w.value - UIMAIN['layout.left'].value -3
 		),
 		filelist_width: UIMAIN['layout.left'] as Ref<number>,
-		fullscreen
+		fullscreen,
+		loading: false
 	};
+
+	
+	// ctxmenu
+	const ctxconfig = reactive({
+		item: [] as Array<CtxMenuData>,
+		display: false,
+		x: 0,
+		y: 0
+	});
+
+	export function contextMenu(data:CtxDispOpts){
+		ctxconfig.x = data.pos_x;
+		ctxconfig.y = data.pos_y;
+		ctxconfig.item = data.content;
+		ctxconfig.display = true;
+	}
 </script>
 
 <template>
+	<!-- 加载进度条 -->
+	<div class="loading" v-if="UI.loading"></div>
 	<!-- 左侧文件 -->
 	<div class="left" :style="{
 		width: UI.filelist_width.value + 'px',
-		left: layout_displayLeft ? '1rem' : '-200vw'
+		left: layout_displayLeft ? '0' : '-200vw'
 	}">
 		<div class="h">
 			<img v-if="UIMAIN.favicon.value" :src="UIMAIN.favicon.value" />
@@ -203,11 +282,11 @@
 		<div class="files vlist" ref="list_ele" tabindex="-1"
 			@contextmenu.prevent @focus="tree_active = true" @blur="tree_active = false"
 		>
-			<Tree :data="TREE"/>
+			<Tree :data="TREE" />
 		</div>
 	</div>
 	<!-- 移动端时左侧的背层 -->
-	<div class="left-overflow" :style="{
+	<div class="left-mask" :style="{
 		opacity: layout_displayLeft ? '1' : '0',
 		display: layout_displayLeft ? 'block' : 'none'
 	}" @click="layout_displayLeft = false"></div>
@@ -235,6 +314,8 @@
 		<Chooser />
 		<!-- 模态框 -->
 		<Alert />
+		<!-- 快捷启动 -->
+		<Command />
 		<!-- 显示选择栏 -->
 		<div class="mobile-tool">
 			<div @click="layout_displayLeft = !layout_displayLeft">
@@ -247,7 +328,7 @@
 </template>
 
 <style lang="scss">
-	@import './font.scss';
+	@import './style/font.scss';
 
 	body {
 		margin: 0;
@@ -260,6 +341,29 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
+
+		@keyframes loading_anim {
+			0%{
+				left: -10vw;
+				width: 0;
+			}50%{
+				left: 10vw;
+				width: 70vw;
+			}75%{
+				left: 120vw;
+				width: 0;
+			}
+		}
+
+		> .loading{
+			position: fixed;
+			top: 0;
+			height: .2rem;
+			border-radius: .1rem;
+			background-color: #65b6c6;
+			z-index: 50;
+			animation: loading_anim 2s linear infinite;
+		}
 
 		>.left,
 		>.resizer,
@@ -330,7 +434,7 @@
 				bottom: 0;
 				left: -.25rem;
 				right: -.25rem;
-				z-index: 45;
+				z-index: 2;
 			}
 		}
 
@@ -392,13 +496,14 @@
 			>.right {
 				position: relative;
 				overflow: hidden;
+				float: right;
 
 				> .mobile-tool{
 					display: none;
 				}
 			}
 
-			> .left-overflow{
+			> .left-mask{
 				display: none !important;
 			}
 		}
@@ -409,16 +514,17 @@
 		body {
 			>.left {
 				position: fixed;
-				top: 1rem;
-				width: calc(100vw - 2rem) !important;
-				height: calc(100vh - 2rem);
-				border-radius: 0.8rem;
-				// padding: 1rem;
+				top: 0;
+				height: 100%;
+				bottom: 0;
 				z-index: 55;
+				width: calc(100vw - 2rem) !important;
+				left: 0;
+				box-shadow: 0 .25rem 1rem #646464;
 			}
 
 			// 遮罩
-			.left-overflow{
+			.left-mask{
 				position: fixed;
 				top: 0;
 				width: 100vw;
@@ -495,8 +601,8 @@
 						}
 					}
 
-					> .app.default_app{
-						display: none !important;
+					> .app.default_app > *{
+						pointer-events: none;
 					}
 				}
 

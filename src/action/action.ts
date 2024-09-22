@@ -1,5 +1,5 @@
 import type { MessageOpinion, FileOrDir, vDir } from "@/env";
-import { APP_API, FS, getActiveFile, Global, splitPath } from "@/utils";
+import { FS, getActiveFile, message, splitPath } from "@/utils";
 
 // 文件操作
 export const FACTION = {
@@ -7,12 +7,12 @@ export const FACTION = {
     action: 'copy' as 'copy' | 'move',
     async exec(dest: vDir): Promise<boolean | number> {
         try{
-            if(this.action === 'copy')
-                FS.copy(this.marked.map(item => item.path), dest.path);
-            else if(this.action ==='move')
-                FS.move(this.marked.map(item => item.path), dest.path);
+            this.action == 'copy'
+                ? await FS.copy(this.marked.map(item => item.path), dest.path)
+                 : await FS.move(this.marked.map(item => item.path), dest.path);
+            await FS.loadPaths([...this.marked.map(item => splitPath(item).dir), dest.path]);
         }catch(e){
-            Global('ui.message').call({
+            message({
                 "type": "error",
                 "title": "文件资源管理器",
                 "content": {

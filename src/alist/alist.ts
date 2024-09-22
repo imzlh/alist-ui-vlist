@@ -1,5 +1,5 @@
-import { Global, splitPath } from "@/utils";
-import { getConfig, regConfig } from "../utils/config";
+import { message, splitPath } from "@/utils";
+import { getConfig, openSetting, regConfig } from "../utils/config";
 import { APP_API } from "/config";
 import jsSHA from "jssha";
 import { Marked } from "marked";
@@ -315,8 +315,19 @@ const AList ={
             },
             body: data? JSON.stringify(data) : null
         })).json();
-        if(json.code != 200)
+        if(json.code != 200){
+            message({
+                "type": "error",
+                "title": "错误",
+                "content": {
+                    "title": "请求失败 HTTP/"+json.code,
+                    "content": json.message
+                },
+                "timeout": 10
+            })
+            if(json.code == 401) openSetting('alist');
             throw new Error(json.message);
+        }
         return json.data;
     },
 
@@ -356,7 +367,7 @@ const AList ={
     },
 
     stat(path: string): Promise<Alist_Stat>{
-        return this.__request('public/stat', 'GET');
+        return this.__request('fs/get', 'GET');
     },
 
     listdir(path: string, password?: string, refresh = false): Promise<Alist_ListDir>{
@@ -479,7 +490,7 @@ const AList ={
         });
     },
 
-    copy(src: Array<string>, dst_dir: string){
+    async copy(src: Array<string>, dst_dir: string){
         // 提取src目录一致的
         const src_prefix = {} as Record<string, Array<string>>;
         for(const path of src){
@@ -491,7 +502,7 @@ const AList ={
         }
         // 执行
         for(const [dir, names] of Object.entries(src_prefix)){
-            this.__request('fs/copy', 'POST', {
+            await this.__request('fs/copy', 'POST', {
                 src_dir: dir,
                 dst_dir,
                 names
@@ -572,7 +583,7 @@ window.addEventListener('load', async function() {
     // 1.获取配置
     AList.config = await AList.get_setting();
     if(AList.config.announcement)
-        Global('ui.message').call({
+        message({
             title: '欢迎来到' + AList.config.site_title,
             content: {
                 title: '',
@@ -585,7 +596,7 @@ window.addEventListener('load', async function() {
     if(CONFIG.username.value && CONFIG.password.value) try{
         await AList.login(CONFIG.username.value, CONFIG.password.value);
     }catch(e){
-        Global('ui.message').call({
+        message({
             title: '登录失败',
             content: {
                 title: '登录失败',

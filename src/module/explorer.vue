@@ -3,7 +3,7 @@
     import type { FileOrDir, vDir } from '@/env';
     import { computed, nextTick, reactive, ref, watch, type Ref } from 'vue';
     import List from './list.vue';
-    import { FACTION, UI, FS, Global, getConfig, openFile, regConfig, splitPath, getActiveFile } from '@/utils';
+    import { FACTION, UI, FS, getConfig, openFile, regConfig, splitPath, getActiveFile, message } from '@/utils';
 
     import { EXP_REG } from '@/action/explorer';
 
@@ -60,7 +60,7 @@
     async function goto(dir: string){
         const tree = await FS.loadPath(dir);
         if(tree) trace.value.unshift(tree);
-        else FS.loadPath(dir).then(res => trace.value.unshift( res )).catch(e => Global('ui.message').call({
+        else FS.loadPath(dir).then(res => trace.value.unshift( res )).catch(e => message({
                 'type': 'error',
                 'content': {
                     'title': '枚举文件失败',
@@ -84,7 +84,7 @@
 
     function open(fd: FileOrDir){
         if (fd.type == 'dir') fd.child ? trace.value.unshift(fd) : FS.loadTree(fd)
-            .then(() => trace.value.unshift(fd)).catch(e => Global('ui.message').call({
+            .then(() => trace.value.unshift(fd)).catch(e => message({
                 'type': 'error',
                 'content': {
                     'title': '枚举文件失败',
@@ -113,7 +113,7 @@
 
     function del(){
         const items = getActiveFile(CFG.parent).map(item => item.path);
-        FS.delete(items);
+        FS.del(items);
     }
 
     function search(text: string){
@@ -128,15 +128,16 @@
 
 <script lang="ts">
     nextTick(() =>
-    regConfig('explorer', [
-        {
-            "type": "number",
-            "default": UI.app_width.value - UI.fontSize.value * 15, 
-            "key": "ui.filebar_size",
-            "name": "路径框大小",
-            "step": 1
-        }
-    ]));
+        regConfig('explorer', [
+            {
+                "type": "number",
+                "default": Math.abs(UI.app_width.value * .5), 
+                "key": "ui.filebar_size",
+                "name": "路径框大小",
+                "step": 1
+            }
+        ])
+    );
 </script>
 
 <template>

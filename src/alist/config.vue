@@ -1,7 +1,6 @@
 <script lang="ts" setup>
     import { onUnmounted, ref, watch } from 'vue';
     import AList, { Alist_ConfigGroup_Names } from './alist';
-import { Global } from '@/utils';
 
     const config = ref(await Promise.all(
         [
@@ -24,7 +23,7 @@ import { Global } from '@/utils';
     onUnmounted(() => changed.value && (async function(){
         for(const item of config.value)
             await AList.save_config_groups(item);
-        Global('ui.message').call({
+        postMessage({
             "type": "success",
             "title": "aList",
             "timeout": 5,

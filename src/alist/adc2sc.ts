@@ -1,6 +1,6 @@
 import type { SettingItem } from "@/env";
 import Setting from "@/module/setting.vue";
-import { Global, type SettingObject } from "@/utils";
+import { createWindow } from "@/utils";
 import type { Alist_Driver_Config, AList_Driver_Config_Item, Alist_Driver_Current_Config } from "@/alist/alist";
 import I_ALIST from "/images/app/alist.svg";
 import AList from "@/alist/alist";
@@ -86,7 +86,7 @@ export async function alistDrvSetting(drv: Alist_Driver_Current_Config, template
         configs.push(getItem(item, exports, true, modified));
     }
 
-    Global('ui.window.add').call({
+    createWindow({
         "name": "AList驱动配置",
         "icon": I_ALIST,
         "content": Setting,

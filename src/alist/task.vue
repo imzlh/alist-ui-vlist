@@ -12,7 +12,7 @@
         }),
         available_downloader = await AList.get_available_downloader(),
         _prop = defineProps(['visibility']);
-    let timer: number | undefined;
+    let timer: number | undefined | NodeJS.Timeout;
 
     watch(taskName, () => {
         timer && clearInterval(timer);

@@ -1,7 +1,7 @@
 <script lang="ts" setup>
-    import { Global } from '@/utils';
-    import AList, { type Alist_Driver_Current_Config } from '@/alist/alist';
-    import { ref, shallowRef, type Component } from 'vue'
+    import { createWindow } from '@/utils';
+    import AList from '@/alist/alist';
+    import { shallowRef, type Component } from 'vue';
     import I_ALIST from '/images/app/alist.svg';
     import Create from './create.vue';
     import { alistDrvSetting } from './adc2sc';
@@ -9,7 +9,7 @@
     const drv = shallowRef(await AList.get_driver());
 
     function open(app: Component, name: string){
-        Global('ui.window.add').call({
+        createWindow({
             name,
             "content": app,
             "icon": I_ALIST

@@ -1,7 +1,7 @@
 <script lang="ts" setup>
     import { reactive, ref, shallowRef } from 'vue';
-import AList, { Alist_User_Class, type Alist_User_Profile } from './alist';
-import { openSetting } from '@/utils';
+    import AList, { Alist_User_Class, type Alist_User_Profile } from './alist';
+    import { openSetting } from '@/utils';
 
     const me = await AList.get_profile(),
         permissions  = {

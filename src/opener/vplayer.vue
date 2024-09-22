@@ -1,16 +1,18 @@
 <script setup lang="ts">
     import type { MessageOpinion, vFile } from '@/env';
     import { regSelf } from '@/opener';
-    import { FS, Global, UI, acceptDrag, clipFName, regConfig, reqFullscreen, splitPath } from '@/utils';
+    import { FS, UI, acceptDrag, clipFName, createWindow, message, registerCommand, reqFullscreen, showFilePicker, splitPath } from '@/utils';
     import ASS from 'assjs';
-    import { onMounted, onUnmounted, ref, shallowReactive, shallowRef, watch } from 'vue';
-    import MediaSession,{ updateMediaSession, type mediaSessionCtrl } from '@/utils/mediaSession';
+    import { nextTick, onMounted, onUnmounted, ref, shallowReactive, shallowRef, watch } from 'vue';
+    import MediaSession, { updateMediaSession } from './media/mediaSession';
+    import { parseSrt } from './media/subsrt';
+    import I_IMAGE from '/images/app/vplayer.webp';
 
     interface subOption {
         name: string,
         url?: string,
         text?: string,
-        sub_type: 'ass' | 'vtt'
+        sub_type: 'ass' | 'vtt' | 'srt'
     }
 
     interface videoOption extends vFile {
@@ -18,8 +20,6 @@
         subtitle: Array<subOption>,
         poster?: string
     }
-
-    const MKV_EXTRACT = ['mkv','webm'];
 
     const opts_ = defineProps(['option', 'visibility']),
         file = opts_['option'] as vFile,
@@ -66,7 +66,7 @@
         }),
         video = shallowRef<HTMLVideoElement>(),
         cached = shallowRef<Array<[number,number]>>([]),
-        ev = defineEmits(['show']);
+        ev = defineEmits(['show', 'close']);
 
     // 时间栏
     const timer = setInterval(() => CFG.datetime = new Date(), 350);
@@ -138,9 +138,34 @@
     }
 
     // 切换字幕
-    watch(() => CFG.subtitle[CFG.sub_current],function(val:subOption){
+    let blob: undefined | string;
+    watch(() => CFG.subtitle[CFG.sub_current], function(val, old){
         if(!val) return;
-        if(val.sub_type == 'vtt') return ass && ass.hide();
+        if(blob) URL.revokeObjectURL(blob), blob = undefined;
+        if(old?.sub_type == 'ass') ass && ass.destroy();
+        else if(old?.sub_type == 'srt' && video.value && video.value.textTracks[0]?.cues){
+            // BUG: https://github.com/whatwg/html/issues/1921
+            // 删除textTrack所有cue
+            for(const cue of video.value.textTracks[0].cues)
+                video.value.textTracks[0].removeCue(cue);
+            // 隐藏
+            video.value.textTracks[0].mode = 'hidden';
+        }
+        
+        if(val.sub_type == 'srt'){
+            if(val.text)
+                parseSrt(val.text, video.value!);
+            else
+                fetch(val.url!).then(res => res.text()).then(text => parseSrt(text, video.value!))
+                    .then(() => CFG.alert = 'SRT字幕加载成功');
+        }
+        else if(val.sub_type == 'vtt'){
+            if(val.text){
+                const blob = new Blob([val.text], { type: 'text/vtt' });
+                const url = URL.createObjectURL(blob);
+                (video.value!.children[0] as HTMLTrackElement).src = url;
+            }
+        }
         else if(CFG.disp_sub) load_sub(val) .then(() => CFG.alert = '字幕加载成功');
 
         // 偏移设置
@@ -150,7 +175,11 @@
 
     // 调整字幕显示状况
     watch(() => CFG.disp_sub,function(val){
-        if(!CFG.subtitle[CFG.sub_current]) return ass && ass.hide();
+        if(!CFG.subtitle[CFG.sub_current]){
+            ass && ass.hide();
+            video.value?.children[0]?.remove();
+            return;
+        }
 
         // ASS需要初始化
         if(CFG.subtitle[CFG.sub_current].sub_type == 'ass'){
@@ -166,10 +195,13 @@
             }else{
                 val ? ass.show() : ass.hide();
             }
+        // 调整texttrack
+        }else{
+            video.value!.textTracks[0].mode = val ? 'showing' : 'hidden';
         }
 
         // 偏移设置
-        else if(CFG.sub_offset)
+        if(CFG.sub_offset)
             init_sub_delay(parseFloat(CFG.sub_offset), parseFloat(CFG.sub_offset));
     });
 
@@ -191,7 +223,8 @@
         CFG.error = false;
 
         // 字幕设置
-        ass && ass.destroy();   // 销毁ASS
+        ass && ass.destroy();               // 销毁ASS
+        video.value.children[0]?.remove();   // 清理track
         CFG.subtitle = val.subtitle;
         if(CFG.subtitle.length > 0) CFG.sub_current = 0;
         else CFG.sub_current = -1;
@@ -229,6 +262,25 @@
         init_sub_delay(parseFloat(val), parseFloat(val) - parseFloat(old));
     })
 
+    // 添加快捷命令
+    onUnmounted(registerCommand({
+        "name": "vplayer.speed",
+        "title": "vPlayer: 倍速播放",
+        handler: () => CFG.vid_rate = CFG.vid_rate <= 2 ? CFG.vid_rate + 0.5 : 0.5
+    }, {
+        "name": "vplayer.mute",
+        "title": "vPlayer: (取消)静音",
+        handler: () => video.value && (video.value.muted = !video.value.muted)
+    }, {
+        "title": "vPlayer: 聚焦",
+        "name": "vplauer.focus",
+        handler: () => video.value && nextTick(() => requestAnimationFrame(() => video.value!.parentElement!.focus()))
+    }, {
+        "title": "vPlayer: 暂停/播放",
+        "name": "vplayer.toggle",
+        handler: () => video.value && (video.value.paused ? video.value.play() : video.value.pause())
+    }))
+
     onMounted(function(){
         if(!video.value) return;
         const vid = video.value;
@@ -257,13 +309,16 @@
         }
         vid.oncanplay = () => vid.playbackRate = CFG.vid_rate;
 
+        // 初始化文件
+        CTRL.play(file)
+
         root.value && acceptDrag(root.value, pl => {
             if(pl.type == 'dir') return;
             const info = splitPath(pl);
-            if(['ass', 'ssa', 'vtt'].includes(info.ext.toLowerCase())){
+            if(CONFIG.subtitle.includes(info.ext.toLowerCase())){
                 CFG.subtitle.push({
                     name: info.name,
-                    sub_type: info.ext == 'vtt' ? 'vtt' : 'ass',
+                    sub_type: info.ext == 'vtt' ? 'vtt' : info.ext == 'srt' ? 'srt' : 'ass',
                     url: pl.url
                 });
             }else CTRL.play(pl);
@@ -272,14 +327,15 @@
 
     function keyev(kbd:KeyboardEvent){
         if(!video.value) return;
-        kbd.preventDefault();kbd.stopPropagation();
         switch(kbd.key){
             case 'ArrowRight':
-                video.value.currentTime += CONFIG.seek_time;
+                if(kbd.ctrlKey) CFG.current ++;
+                else video.value.currentTime += CONFIG.seek_time;
             break;
 
             case 'ArrowLeft':
-                video.value.currentTime -= CONFIG.seek_time;
+                if(kbd.ctrlKey) CFG.current --;
+                else video.value.currentTime -= CONFIG.seek_time;
             break;
 
             case 'ArrowUp':
@@ -294,7 +350,12 @@
             case 'Enter':
                 video.value.paused ? video.value.play() : video.value.pause();
             break;
+
+            default:
+                return;
         }
+
+        kbd.preventDefault();kbd.stopPropagation();
     }
 
     const touch = {
@@ -374,7 +435,8 @@
         subtitle: [
             "ssa",
             "ass",
-            "vtt"
+            "vtt",
+            "srt"
         ],
         "video": [
             "webm",
@@ -395,23 +457,23 @@
         pick_sub() {
             const subnow = CFG.subtitle.map(each => each.name),
                 subfor = CFG.current;
-            Global('ui.choose').call(this.dir)
-                .then((items: Array<vFile>) => items.forEach(each => {
+            showFilePicker(this.dir, 'file')
+                .then(items => items.forEach(each => {
                     // 已经包含
                     if (subnow.includes(each.name)) return;
                     // 字幕太大
-                    // if (each.size > 10 * 1024 * 1024) return Global('ui.message').call({
-                    //     "type": "error",
-                    //     "title": "vPlayer",
-                    //     "content": {
-                    //         "title": "无法打开" + clipFName(each, 15),
-                    //         "content": '文件太大，libass拒绝渲染'
-                    //     }
-                    // } satisfies MessageOpinion);
+                    if (each.size > 10 * 1024 * 1024) return message({
+                        "type": "error",
+                        "title": "vPlayer",
+                        "content": {
+                            "title": "无法打开" + clipFName(each, 15),
+                            "content": '文件太大, 极易造成卡顿或崩溃\n请选择较小的文件'
+                        }
+                    } satisfies MessageOpinion);
                     // 非推荐格式
                     const info = splitPath(each);
-                    if (!['ass', 'ssa', 'vtt'].includes(info.ext.toLowerCase()))
-                        return Global('ui.message').call({
+                    if (!CONFIG.subtitle.includes(info.ext.toLowerCase()))
+                        return message({
                             "type": "warn",
                             "title": "vPlayer",
                             "content": {
@@ -423,7 +485,7 @@
                     // 推入列表
                     CFG.playlist[subfor].subtitle.push({
                         name: info.name,
-                        sub_type: info.ext == 'vtt' ? 'vtt' : 'ass',
+                        sub_type: info.ext == 'vtt' ? 'vtt' : info.ext == 'srt' ? 'srt' : 'ass',
                         url: each.url
                     });
                     // 设置为当前字幕
@@ -460,6 +522,7 @@
                     if (CONFIG.video.includes(info.ext.toLowerCase())) {
                         if (item.name == file.name)
                             id = i;
+                        i ++;
                         // 转换
                         (item as videoOption).vid_name = info.name;
                         CFG.playlist.push(item as videoOption);
@@ -469,7 +532,7 @@
                         if (!(info.name in subs)) subs[info.name] = [];
                         subs[info.name].push({
                             name: info.name,
-                            sub_type: info.ext == 'vtt' ? 'vtt' : 'ass',
+                            sub_type: info.ext == 'vtt' ? 'vtt' : info.ext == 'srt' ? 'srt' : 'ass',
                             url: item.url
                         })
                     // 是图片：poster
@@ -494,7 +557,7 @@
 
             if (id !== undefined){
                 CFG.current = id;
-            }else Global('ui.message').call({
+            }else message({
                 "type": "error",
                 "title": "vPlayer",
                 "content": {
@@ -516,9 +579,12 @@
                     const url = URL.createObjectURL(blob);
                     if(open){
                         CFG.alert = '截图完成';
-                        const win = window.open(url);
-                        if(win) win.onbeforeunload = () =>
-                            URL.revokeObjectURL(url);    // 销毁链接
+                        createWindow({
+                            "name": "屏幕截图-" + new Date().toLocaleString(),
+                            "content": url,
+                            "onDestroy": () => URL.revokeObjectURL(url),
+                            "icon": I_IMAGE
+                        });
                     }
                     resolve(url);
                 },"image/webp");
@@ -536,9 +602,6 @@
         cancel();
         clearInterval(timer);
     });
-
-    // 初始化文件
-    CTRL.play(file);
 </script>
 
 <template>
@@ -547,11 +610,11 @@
         @pointermove="mouse" @click="mouse" ref="root"
         @keydown="keyev" v-touch 
     >
-        <div class="video" :width="CFG.vid_state"
+        <div class="video" :width="CFG.vid_state" tabindex="-1"
             @touchstart.stop.prevent="touch.start" @touchmove.stop.prevent="touch.move" @touchend.stop.prevent="touch.end"
         >
             <video ref="video">
-                <track :default="CFG.disp_sub" v-if="CFG.subtitle[CFG.sub_current] && CFG.subtitle[CFG.sub_current].sub_type == 'vtt'"
+                <track default v-if="CFG.subtitle[CFG.sub_current]?.sub_type == 'vtt'"
                     kind="captions" label="vtt sub" :src="CFG.subtitle[CFG.sub_current].url" />
             </video>
             <!-- 错误提示 -->
@@ -801,6 +864,7 @@
             max-width: 100%;max-height: 100%;
             width: auto !important;height: auto !important;
             position: relative;
+            outline: none;
 
             // 'auto' | 'width' | 'height' | 'full'
             &[width=width]{
@@ -867,14 +931,14 @@
 
                 &::cue{
                     background-color: transparent;
-                    text-shadow: black 2px 0 0,
-                        black 0 2px 0,
-                        black -2px 0 0,
-                        black 0 -2px 0,
-                        black 2px 2px 0,
-                        black -2px -2px 0,
-                        black 2px -2px 0,
-                        black -2px 2px 0;
+                    text-shadow: black 1px 0 0,
+                        black 0 1px 0,
+                        black -1px 0 0,
+                        black 0 -1px 0,
+                        black 1px 1px 0,
+                        black -1px -1px 0,
+                        black 1px -1px 0,
+                        black -1px 1px 0;
                 }
             }
         }
@@ -943,6 +1007,9 @@
                 top: -2rem;left: 0;right: 0;
                 padding: .5rem;
                 font-size: .95rem;
+                font-family: 'Repair';
+                font-weight: 600;
+                letter-spacing: 1px;
 
                 .total{
                     float: right;

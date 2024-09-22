@@ -1,33 +1,34 @@
-<script setup lang="ts">
+<script lang="ts">
 	import type { CtxDispOpts, TabWindow } from '@/env';
-	import { Global } from '@/utils';
-	import { ref, reactive, toRaw, markRaw, watch } from 'vue';
+	import { contextMenu, registerCommand } from '@/utils';
+	import { ref, reactive, watch, nextTick, toRaw } from 'vue';
 	import I_OFF from "/images/icon/off.webp";
-	import Home from '@/alist/home.vue';
 
 	const tabs = reactive<Record<string, TabWindow>>({}),
 		current = ref<string>('');
 
-	const func = {
-		set(to: string) {
-			const from = current.value;
-			current.value = to;
-			if (tabs[from] && tabs[from].onLeave) (tabs[from].onLeave as Function)();
-			if (tabs[to] && tabs[to].onLeave) (tabs[to].onLeave as Function)();
-		},
+	export function setCurrent(to: string) {
+		const from = current.value;
+		current.value = to;
+		if (tabs[from] && tabs[from].onLeave) (tabs[from].onLeave as Function)();
+		if (tabs[to] && tabs[to].onLeave) (tabs[to].onLeave as Function)();
+	}
 
-		add(item: TabWindow) {
-			const uuid = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
-			tabs[current.value = uuid] = item;
+	export function create(item: TabWindow) {
+		const uuid = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
+		tabs[current.value = uuid] = item;
 
-			watch(() => tabs[current.value], val => val || item.onDestroy?.call(item));
+		watch(() => tabs[current.value], val => val || (item.onDestroy?.call(item), item.onDestroy = undefined));
 
-			return uuid;
-		}
-	};
+		return uuid;
+	}
+
+	export function destory(uuid: string) {
+		delete tabs[uuid];
+	}
 
 	function ctxMenu(ev: MouseEvent, i: string) {
-		Global('ui.ctxmenu').call({
+		contextMenu({
 			"pos_x": ev.clientX,
 			"pos_y": ev.clientY,
 			"content": [
@@ -48,22 +49,39 @@
 		now?.onDisplay && now.onDisplay();
 		old?.onLeave && old.onLeave();
 	})
+</script>
 
-	Global('ui.window').data = func;
-	defineExpose(func);
+<script lang="ts" setup>
+	import Home from '../alist/home.vue';
+
+	nextTick(() => registerCommand({
+		"title": "关闭当前工作区",
+		"name": "app.close_current",
+		handler: () => delete tabs[current.value]
+	}, {
+		"title": "回到首页",
+		"name": "app.home",
+		handler: () => current.value = ''
+	}));
 </script>
 
 <template>
-	<div class="tab" v-bind="$attrs">
+	<TransitionGroup name="tab" tag="div" v-bind="$attrs" class="tab" v-drag>
 		<template v-for="(data, i) in tabs" :key="i">
 			<div v-if="data" @click="current = i" @contextmenu.prevent="ctxMenu($event, i)"
 				:active="current == i"
 			>
 				<img :src="data.icon" onerror="this.style.display = 'none';" class="icon">
 				<span>{{ data.name }}</span>
-				<i class="close" @click.stop="delete tabs[i];current = '';"></i>
+				<i class="close" @click.stop="delete tabs[i];"></i>
 			</div>
 		</template>
+	</TransitionGroup>
+
+	<div class="app default_app" :style="{
+		display: (!tabs[current] || Object.keys(tabs).length == 0) ? 'block' : 'none'
+	}" @click="current = '__main__'">
+		<Home />
 	</div>
 
 	<template v-for="(data, i) in tabs" :key="i">
@@ -71,11 +89,12 @@
 			<div class="app-meta-header" @click="current = i">
 				<img :src="data.icon" onerror="this.style.display = 'none';" class="icon">
 				<span>{{ data.name }}</span>
-				<i class="close" @click="delete tabs[i];current = '';"></i>
+				<i class="close" @click="delete tabs[i];"></i>
 			</div>
 			<suspense>
-				<component :is="toRaw(data.content)" :option="data.option" :visibility="current == i"
-					@close="delete tabs[i];current = '';" @hide="current = ''" @show="current = i" @chTitle="data.name = $event"
+				<div class="webview" v-if="typeof data.content === 'string'" v-webview="data.content"></div>
+				<component v-else :is="toRaw(data.content)" :option="data.option" :visibility="current == i"
+					@close="delete tabs[i];" @hide="current = ''" @show="current = i" @chTitle="data.name = $event"
 				/>
 
 				<template #fallback>
@@ -84,16 +103,11 @@
 			</suspense>
 		</div>
 	</template>
-
-	<div class="app default_app" v-show="current == ''">
-		<Home />
-	</div>
-
 </template>
 
 
-<style lang="scss">
-	@import '@/icon.scss';
+<style lang="scss" scoped>
+	@import '@/style/icon.scss';
 
 	.tab {
 		padding: .45rem;
@@ -105,7 +119,8 @@
 		position: absolute;
 		top: 0;
 		left: 0;
-		right: 0;
+		max-width: 100%;
+		box-sizing: border-box;
 
 		scroll-behavior: smooth;
 
@@ -115,11 +130,11 @@
 
 		@keyframes tab_jumpin {
 			from{
-				transform: translateY(-5rem) scale(0);
 				opacity: 0;
+				transform: translateX(-1rem);
 			}to{
-				transform: none;
 				opacity: 1;
+				transform: none;
 			}
 		}
 
@@ -140,7 +155,7 @@
 			transition: all .2s;
 			position: relative;
 			font-size: .85rem;
-			animation: jumpin .3s linear forwards;
+			animation: tab_jumpin .3s linear forwards;
 
 			&[active=true]::before {
 				content: '';
@@ -159,6 +174,11 @@
 
 			&:hover > i.close{
 				display: block;
+			}
+
+			&.tab-leave-active{
+				width: 0;
+				overflow: hidden;
 			}
 
 			>img {
@@ -224,22 +244,13 @@
 			}
 		}
 
-		&.default_app {
-			z-index: -1;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-
-			svg {
-				display: block;
-				fill: rgb(178, 174, 167);
-				width: 100%;
-				max-width: 4rem;
-			}
-		}
-
 		> div{
 			outline: none;
+		}
+
+		> div.webview{
+			width: 100%;
+			height: 100%;
 		}
 
 		.tab-loading{
