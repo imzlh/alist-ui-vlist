@@ -21,21 +21,21 @@ jobs:
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-    - run: npm i
-    - run: npm run build --if-present
-    - run: tar -zcvf release.tgz dist/
-    - name: rename
-      run: |
-        mv dist/ ~/vlist_pkg/
-        mv release.tgz ~/dist/
+      - uses: actions/checkout@v4
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm i
+      - run: npm run build --if-present
+      - run: tar -zcvf release.tgz dist/
+      - name: rename
+        run: |
+          mv dist/ ~/vlist_pkg/
+          mv release.tgz ~/dist/
         
-    - name: Setup deno
-      run: |
+      - name: Setup deno
+        run: |
           curl -L https://github.com/denoland/deno/releases/download/v1.45.5/deno-x86_64-unknown-linux-gnu.zip -o deno.zip
           unzip deno.zip
           rm deno.zip
