@@ -30,13 +30,13 @@
                 <header v-if="item.title">
                     <img v-if="item.icon" :src="item.icon">
                     <span>{{ item.title }}</span>
-                    <i class="close" @click="msg_destroy(i)"></i>
+                    <i class="close" @click="msg_destroy(i)" vs-icon="x"></i>
                 </header>
                 <template v-if="item.content">
                     <div class="body" :data-level="item.type">
                         <div>
                             <h3>{{ item.content.title }}</h3>
-                            <span v-html="item.content.content"></span>
+                            <span v-html="item.content.content" />
                         </div>
                     </div>
                 </template>
@@ -92,7 +92,6 @@
                 font-size: .8rem;
 
                 .close {
-                    content: $icon_right;
                     opacity: .2;
                     width: 1.2em;
 

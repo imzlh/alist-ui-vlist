@@ -1,5 +1,5 @@
 import I_VSCODE from '/images/app/vscode.webp';
-import I_CHROME from '/images/app/chrome.webp';
+import I_CHROME from '/images/app/chrome.svg';
 import I_HEX from '/images/app/hex.webp';
 import type { MessageOpinion, OpenerOption, vFile } from './env';
 import { clipFName, createWindow, message, selectOpener, splitPath } from './utils';
@@ -13,6 +13,10 @@ import I_MEDIA from '/images/app/video.webp';
 import I_PS from '/images/app/ps.webp';
 import I_ASCIINEMA from '/images/app/asciinema.svg';
 import I_NOTES from '/images/app/notes.webp';
+import I_WORD from '/images/app/word.svg';
+import I_EXCEL from '/images/app/excel.svg';
+import I_PPT from '/images/app/ppt.svg';
+import I_OFFICE from '/images/app/office.svg';
 
 export const OPENER:Array<OpenerOption> = [
     // Monaco-Editor(VsCode)
@@ -75,6 +79,33 @@ export const OPENER:Array<OpenerOption> = [
                 "option": file
             });
         },
+    },
+    // office pack
+    // Copyright(C) 2024 izGroup
+    {
+        "name": "Office Pack",
+        "type": "application/vnd.ms-office",
+        "typeDesc": "在线预览Word/Excel/PowerPoint文档",
+        "icon": I_OFFICE,
+        "format": [
+            "xlsx",
+            "pptx",
+            "docx",
+            "vsheet"
+        ],
+        async open(file) {
+            createWindow({
+                "content": (await import('@/opener/office.vue')).default,
+                "icon": ({
+                    'docx': I_WORD,
+                    'xlsx': I_EXCEL,
+                    'pptx': I_PPT,
+                    'vsheet': I_EXCEL
+                })[splitPath(file).ext] || I_OFFICE,
+                "name": file.name + " - Office",
+                "option": file
+            });
+        }
     },
     // asciinema
     // @link https://asciinema.org/
@@ -211,7 +242,11 @@ export const OPENER:Array<OpenerOption> = [
             "mov",
             "m2ts",
             "ivf",
-            "wav"
+            "wav",
+            "h264",
+            "hevc",
+            "vvc",
+            "aac"
         ],
         async open(file) {
             createWindow({

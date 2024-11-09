@@ -53,9 +53,9 @@
                     <input v-if="item.type == 'text'" v-model="item.value.value" class="right input" type="text">
 
                     <div v-else-if="item.type == 'number'" class="right numinput">
-                        <div class="minus" @pointerdown="click($event, -item.step, item.value)"></div>
+                        <div vs-icon="minus" button class="minus" @pointerdown="click($event, -item.step, item.value)"></div>
                         <div class="real">{{ item.value.value }}</div>
-                        <div class="add" @pointerdown="click($event, item.step, item.value)"></div>
+                        <div vs-icon="plus" button class="add" @pointerdown="click($event, item.step, item.value)"></div>
                     </div>
 
                     <input v-else-if="item.type == 'check'" class="right check" type="checkbox"
@@ -67,7 +67,7 @@
                         :min="item.min" :max="item.max" :step="item.step"
                     >
 
-                    <div v-else-if="item.type == 'object'" class="goto right"></div>
+                    <div v-else-if="item.type == 'object'" vs-icon="right" class="goto right"></div>
 
                     <div v-else class="right choose">
                         <div tabindex="-1">
@@ -248,30 +248,12 @@
                     &.numinput {
                         display: flex;
                         align-items: center;
-                        gap: .75rem;
+                        gap: .45rem;
                         background-color: white;
                         border: solid .1rem #e2dfdf;
-                        padding: .35rem .5rem;
                         border-radius: .35rem;
                         flex-grow: 0;
-
-                        >.minus {
-                            content: $icon_min;
-                        }
-
-                        >.add {
-                            content: $icon_add;
-                        }
-
-                        >.minus,
-                        >.add {
-                            height: 1rem;
-                            opacity: .6;
-
-                            &:hover {
-                                opacity: 1;
-                            }
-                        }
+                        padding: .15rem .3rem;
 
                         >.real {
                             font-size: .85rem;
@@ -279,7 +261,6 @@
                     }
 
                     &.goto {
-                        content: $icon_right;
                         width: .8rem;
                         height: .8rem;
                         flex-grow: 0;

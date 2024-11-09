@@ -17,7 +17,7 @@ import AV1_WASM from 'libmedia/dist/decode/av1-simd.wasm?url';
 import OPUS_WASM from 'libmedia/dist/decode/opus-simd.wasm?url';
 import FLAC_WASM from 'libmedia/dist/decode/flac-simd.wasm?url';
 import OGG_WASM from 'libmedia/dist/decode/vorbis-simd.wasm?url';
-import AC3_WASM from 'libmedia/dist/decode/vorbis-simd.wasm?url';
+import AC3_WASM from 'libmedia/dist/decode/ac3-simd.wasm?url';
 import EAC3_WASM from 'libmedia/dist/decode/eac3-simd.wasm?url';
 import DTS_WASM from 'libmedia/dist/decode/dca-simd.wasm?url';
 import VP9_WASM from 'libmedia/dist/decode/vp9-simd.wasm?url';
@@ -85,6 +85,7 @@ export default async function create(el){
         "preLoadTime": 2
     });
 
+    let not_sync = false;
     const refs = reactive({
         url: '',
         playBackRate: 1,
@@ -106,7 +107,7 @@ export default async function create(el){
         play: false,
         stop: false,
         destroy: () => player.destroy(),
-        status: player.stats,
+        status: player.getStats(),
         display: {
             fill: false,
             rotate: 0,
@@ -133,6 +134,7 @@ export default async function create(el){
             nextFrame(){
                 refs.play = false;
                 player.playNextFrame();
+                not_sync = true;
             },
             resize(){
                 const size = el.getBoundingClientRect();
@@ -161,14 +163,23 @@ export default async function create(el){
             }
             refs.ended = false;
             refs.tracks.chapter = player.getChapters();
+            // 其他设置
             player.play().then(() => refs.play = true);
+            player.setSubtitleDelay(refs.display.subDelay);
         }
     )});
     watch(() => refs.stop, res => res ? player.resume() : player.stop())
     watch(() => refs.playBackRate, rate => player.setPlaybackRate(rate));
     watch(() => refs.loop, loop => player.setLoop(loop));
     watch(() => refs.volume, vol => player.setVolume(vol));
-    watch(() => refs.play, state => state ? player.play() : player.pause());
+    watch(() => refs.play, async state => {
+        if(not_sync) {
+            console.debug('avPlayer: not sync, seek to current time');
+            await player.seek(player.currentTime);
+            not_sync = false;
+        } 
+        state ? player.play() : player.pause();
+    });
     watch(() => refs.tracks.audioTrack, id => id && player.getSelectedAudioStreamId() != id && player.selectAudio(id));
     watch(() => refs.tracks.videoTrack, id => id > 0 && player.getSelectedVideoStreamId() != id && player.selectVideo(id));
     watch(() => refs.tracks.subTrack, id => id > 0 && player.getSelectedSubtitleStreamId() != id && player.selectSubtitle(id));
@@ -176,7 +187,7 @@ export default async function create(el){
     watch(() => refs.display.rotate, rotate => player.setRotate(rotate));
     watch(() => refs.display.flip.horizontal, flip => player.enableHorizontalFlip(flip));
     watch(() => refs.display.flip.vertical, flip => player.enableVerticalFlip(flip));
-    watch(() => refs.display.subDelay, delay => player.setSubTitleDelay(Number(delay)));
+    watch(() => refs.display.subDelay, delay => player.setSubtitleDelay(Number(delay)));
     watch(() => refs.display.subtitle, sub => player.setSubtitleEnable(sub));
 
     player.on('ended', () => refs.ended = true);

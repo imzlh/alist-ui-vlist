@@ -28,7 +28,7 @@ export default defineConfig({
                 "globPatterns": [
                     '**/*.{js,css,html,webp,ico,svg,woff2}'
                 ],
-                maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+                maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
                 globIgnores: [
                     'type/(*.svg)'
                 ]
@@ -122,18 +122,27 @@ export default defineConfig({
                 ],
                 icons: [
                     {
-                        src: 'image/favicon.ico',
+                        src: 'favicon.ico',
                         sizes: '128x128',
                         type: 'image/ico'
                     },
                     {
-                        src: 'image/favicon.svg',
+                        src: 'favicon.svg',
                         sizes: '512x512',
                         type: 'image/svg+xml'
                     }
                 ]
             }
-        })
+        }),
+        // 将vite-client移动位置
+        {
+            name: 'my-plugin',
+            transformIndexHtml(html) {
+                return html
+                    .replace(/<head>\s*<script\s+type="module"\s+src="\/@vite\/client"><\/script>/, '')
+                    .replace('</head>', '<script type="module" src="/@vite/client"></script></head>');
+            }
+        }
     ],
     resolve: {
         alias: {
@@ -219,7 +228,8 @@ export default defineConfig({
                             '/vscode',
                             '/epub',
                             '/psd',
-                            '/whiteboard'
+                            '/whiteboard',
+                            '/office'
                         ].some(item => id.includes(item)))
                     ) return 'main';
                     // monaco
@@ -237,11 +247,18 @@ export default defineConfig({
                     // asciinema
                     if(id.includes('/asciinema'))
                         return 'asciinema';
+                    // office
+                    if(id.includes('/office/'))
+                        return 'office';
                     // additional pack
                     if(id.includes('/psd') || id.includes('/artplayer') || id.includes('/epub.vue') || id.includes('vue-reader'))
                         return 'additional';
                 },
             },
+            input: {
+                'index': './index.html',
+                'init': "./src/init.ts"
+            }
         },
         chunkSizeWarningLimit: 1000
     },

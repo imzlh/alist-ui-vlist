@@ -129,13 +129,16 @@
 		if(locked) return;
 		const target = e.target as HTMLElement;
 		// 切换活动ID
-		if((target.classList.contains('item') || target.classList.contains('parent')) && target.dataset.position){
-			const index = target.dataset.position.lastIndexOf(':'),
-				tree = await FS.stat(target.dataset.position!.substring(0, index)),
-				id = parseInt(target.dataset.position.substring(index + 1));
-			current_tree = tree.type == 'dir' ? tree : tree.parent!, 
-			current_index = id, handleUpdate(true);
-		}
+		if(target.classList.contains('item') || target.classList.contains('parent'))
+			if(target.dataset.position){
+				const index = target.dataset.position.lastIndexOf(':'),
+					tree = await FS.stat(target.dataset.position!.substring(0, index)),
+					id = parseInt(target.dataset.position.substring(index + 1));
+				current_tree = tree.type == 'dir' ? tree : tree.parent!, 
+				current_index = id, handleUpdate(true);
+			}else{
+				current_tree = TREE.parent!, current_index = 0, handleUpdate(true);
+			}
 	})));
 
 	const tree_active = ref(false),
@@ -200,6 +203,14 @@
 			"default": 18,
 			"name": "缩放",
 			"key": "layout.fontSize"
+		},
+		'身份设置',
+		{
+			"type": "text",
+			"default": '',
+			"key": "authkey",
+			"name": "身份ID",
+			"desc": "用于身份验证，解锁文件系统操作"
 		},
 		'个性化',
 		{
@@ -318,17 +329,15 @@
 		<Command />
 		<!-- 显示选择栏 -->
 		<div class="mobile-tool">
-			<div @click="layout_displayLeft = !layout_displayLeft">
-				<svg viewBox="0 0 16 16">
-					<path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
-				</svg>
-			</div>
+			<div @click="layout_displayLeft = !layout_displayLeft" vs-icon="right"></div>
 		</div>
 	</div>
 </template>
 
 <style lang="scss">
-	@import './style/font.scss';
+	// 全局导入
+	@import './style/font.css';
+	@import './style/icon.css';
 
 	body {
 		margin: 0;
@@ -395,6 +404,9 @@
 
 				font-size: 1.6rem;
 				line-height: 3rem;
+
+				// PWA: 允许拖拽
+				-webkit-app-region: drag;
 
 				>svg, >img {
 					display: inline-block;

@@ -70,6 +70,11 @@ interface FileAndDir {
     ctime: number,
 
     /**
+     * 修改时间
+     */
+    mtime: number,
+
+    /**
      * 文件（夹）直链
      */
     url: string,
@@ -573,4 +578,104 @@ interface Command{
      * 命令的回调函数
      */
     handler():any;
+}
+
+/**
+ * vList 外置插件配置的数据结构
+ */
+interface vApplication{
+
+    /**
+     * 插件名称
+     */
+    name: string,
+
+    /**
+     * 插件内部名称
+     */
+    package: string,
+
+    /**
+     * 插件版本
+     */
+    version: number,
+
+    /**
+     * 插件作者
+     */
+    author?: string,
+
+    /**
+     * 插件入口
+     */
+    entry: string,
+
+    /**
+     * 预加载和导入
+     */
+    preload?: Array<{
+        /**
+         * 类型，可选`style`、`script`、`module`、`preload`
+         *  - `style` 样式文件
+         *  - `script` 脚本文件
+         *  - `module` 模块文件
+         *  - `preload` 单纯预加载，不导入
+         */
+        type: "style" | "script" | "module" | "preload",
+
+        /**
+         * 文件路径
+         */
+        path: string
+    }>,
+
+    /**
+     * 图标文件
+     */
+    icon?: string,
+
+    /**
+     * 插件描述
+     */
+    description?: string,
+
+    /**
+     * 插件目录
+     */
+    home: string
+}
+
+// ---------- directive ----------
+
+declare module 'vue' {
+    /**
+     * vList预定义指令
+     */
+    interface ComponentCustomProperties {
+        /**
+         * 适用于vs-icon的颜色变换，用于将黑色图标转换颜色值
+         */
+        colorscale: Directive<HTMLElement, [number, number, number]>,
+        
+        /**
+         * 将iframe插入到指定元素中
+         */
+        webview: Directive<HTMLElement, string, {
+            'right-bottom'?: boolean,
+            'left-bottom'?: boolean,
+            'left-top'?: boolean
+        }>,
+
+        /**
+         * 将触摸抽象为pointer
+         */
+        touch: Directive<HTMLElement, any, {
+            prevent?: boolean,
+        }>,
+
+        /**
+         * 允许将元素拖动，默认为拖动父元素
+         */
+        drag: Directive<HTMLElement, any>
+    }
 }

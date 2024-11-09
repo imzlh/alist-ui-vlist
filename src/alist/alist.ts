@@ -558,6 +558,31 @@ const AList ={
 
     task_action(action: "delete" | "cancel" | "retry", type: string, id: string){
         return this.__request(`admin/task/${type}/${action}?id=${id}`, 'POST');
+    },
+
+    upload(file: Blob, path: string, callback?: (xhr: XMLHttpRequest) => any): Promise<string>{
+        return new Promise((rs, rj) => {
+            const xhr = new XMLHttpRequest();
+            xhr.timeout = 60000;
+            xhr.addEventListener('load', () => 
+                Math.floor(xhr.status / 100) == 2
+                    ? rs(xhr.responseText)
+                    : rj(new Error('Status ' + xhr.status + ': ' + xhr.responseText))
+            );
+            xhr.addEventListener('error', () => {
+                rj(new Error('Network Error'));
+            });
+            xhr.addEventListener('timeout', rj);
+
+            xhr.open('PUT',APP_API + 'fs/put');
+            xhr.setRequestHeader('file-path', path);
+            xhr.setRequestHeader('Content-Type', file.type);
+            xhr.setRequestHeader('authorization', AList.jwt_key);
+
+            callback && callback(xhr);
+
+            xhr.send(file);
+        });
     }
 };
 export default AList;
@@ -578,7 +603,7 @@ regConfig('alist', [
     }
 ]);
 // 自启动
-window.addEventListener('load', async function() {
+async function loaded_callback() {
     const CONFIG = getConfig('alist');
     // 1.获取配置
     AList.config = await AList.get_setting();
@@ -610,4 +635,7 @@ window.addEventListener('load', async function() {
     const ref = getConfig('基础');
     ref.appname.value = AList.config.site_title;
     ref.favicon.value = AList.config.logo;
-});
+}
+
+if(document.readyState == 'complete') loaded_callback();
+else document.addEventListener('DOMContentLoaded', loaded_callback);

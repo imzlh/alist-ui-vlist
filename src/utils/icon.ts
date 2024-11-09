@@ -1071,7 +1071,7 @@ const folderIcon: FolderIcon[] = [
             'tldb'
         ],
     },
-    { name: 'javascript', fileExtensions: ['esx', 'mjs', 'js'] },
+    { name: 'javascript', fileExtensions: ['esx', 'mjs', 'js', 'cjs'] },
     { name: 'react', fileExtensions: ['jsx'] },
     { name: 'react_ts', fileExtensions: ['tsx'] },
     {
@@ -1182,7 +1182,7 @@ const folderIcon: FolderIcon[] = [
     { name: 'pdf', fileExtensions: ['pdf'] },
     {
         name: 'table',
-        fileExtensions: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv', 'psv', 'ods'],
+        fileExtensions: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv', 'psv', 'ods', 'vsheet'],
     },
     {
         name: 'vscode',
@@ -3272,21 +3272,21 @@ export function getIcon(name: string, is_file = true){
             const element = fileIcon[i];
             
             if(element.fileNames?.includes(name.toLowerCase()))
-                full_match = APP_ROOT + `/images/type/${element.name}.svg`;
+                full_match = APP_ROOT (`./images/type/${element.name}.svg`);
 
             else if(element.fileExtensions?.includes(ext))
-                ext_match =  APP_ROOT + `/images/type/${element.name}.svg`;
+                ext_match =  APP_ROOT(`./images/type/${element.name}.svg`);
 
             else for (const key in element.patterns)
                 if(name.startsWith(key) && enumatch[(element.patterns as any)[key]].includes(ext))
-                    half_match =  APP_ROOT + `/images/type/${element.name}.svg`;
+                    half_match =  APP_ROOT (`./images/type/${element.name}.svg`);
         }
 
         return full_match || half_match || ext_match || I_File;
     }else{
         for (let i = 0; i < folderIcon.length; i++)
             if(folderIcon[i].folderNames.includes(name))
-                return  APP_ROOT + `/images/type/${folderIcon[i].name}.svg`;
+                return  APP_ROOT(`./images/type/${folderIcon[i].name}.svg`);
         return I_DIR;
     }
 }

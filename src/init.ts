@@ -35,6 +35,9 @@ import { createApp, ref, type Ref } from 'vue';
 // 打开方式注册
 import './opener';
 
+// 全局右键
+import './utils/globalCtxmenu';
+
 // 主要的应用入口
 import App from './App.vue';
 
@@ -54,7 +57,6 @@ interface Touch{
 
 // 触摸管理
 let touch: undefined | Touch;
-document.documentElement.addEventListener('contextmenu', el => el.preventDefault());
 document.documentElement.addEventListener('touchmove', ev => {
     if(!touch) return;
 
@@ -133,7 +135,7 @@ document.documentElement.addEventListener('pointerleave', () => {
     dragEl.el.style.top = `${dragEl.ry}px`,
     dragEl = undefined;
     document.documentElement.style.cursor = 'default';
-})
+});
 
 // 挂载应用
 const app = createApp(App);
@@ -165,6 +167,13 @@ app.directive('drag', {
         }));
     }
 });
+
+// v-colorscale
+import { toFilter } from './utils/colorScale';
+app.directive('colorscale', (el, binding) => 
+    // @ts-ignore
+    el.style.setProperty('--vs-colorscale', toFilter(...binding.value))
+);
 
 // OPTIONAL vWebView
 import { vWebView } from  './utils/webview';

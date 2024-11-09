@@ -1,8 +1,29 @@
 {
-  "name": "vlist",
-  "version": "5.7",
-  "private": true,
+  "name": "@imzlh/vlist",
+  "version": "5.8.1",
+  "displayName": "vList",
+  "description": "一个全能的现代化的文件管理UI，使用vue3",
+  "license": "MIT",
+  "keywords": [
+    "vList5",
+    "vList",
+    "file-manager",
+    "file-sharing",
+    "media-player"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imzlh/vList5.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "type": "module",
+  "dev": {
+    "file_server": "http://localhost:5244/d/",
+    "api_server": "http://localhost:5244/api/"
+  },
   "scripts": {
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" -- && cp node_modules/libmedia/dist/avplayer/*.avplayer.js dist/assets/ || copy node_modules\\libmedia\\dist\\avplayer\\*.avplayer.js dist/assets/",
@@ -10,36 +31,47 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --build --force"
   },
-  "dependencies": {
+  "devDependencies": {
     "@muyajs/core": "^0.0.32",
     "@petamoriken/float16": "^3.8.7",
     "@tldraw/assets": "^2.4.6",
+    "@types/ini": "^4.1.1",
+    "@types/node": "^20.14.11",
     "@vitejs/plugin-vue": "^5.0.4",
     "@vue/tsconfig": "^0.5.1",
     "@webtoon/psd": "^0.4.0",
     "artplayer": "^5.1.5",
     "asciinema-player": "^3.8.0",
     "assjs": "^0.1.0",
+    "cheap": "https://github.com/zhaohappy/cheap.git",
+    "docx-preview": "^0.3.2",
     "ini": "^5.0.0",
     "jssha": "^3.3.1",
     "libmedia": "https://github.com/zhaohappy/libmedia.git",
+    "libmedia-common": "https://github.com/zhaohappy/common.git",
     "lrc-kit": "^1.1.1",
     "monaco-editor": "^0.50.0",
+    "npm-run-all2": "^6.1.2",
     "react-filerobot-image-editor": "^4.8.1",
     "sass": "^1.77.4",
     "tldraw": "^2.4.6",
-    "typescript": "~5.4.0",
+    "typescript": "^5.4.0",
     "vite": "^5.3.4",
     "vite-plugin-pwa": "^0.20.0",
     "vue": "^3.4.21",
     "vue-reader": "^1.2.15",
     "vue-tsc": "^2.0.11",
-    "@types/ini": "^4.1.1"
+    "x-data-spreadsheet": "^1.1.9"
   },
-  "devDependencies": {
-    "@types/node": "^20.14.11",
-    "cheap": "https://github.com/zhaohappy/cheap.git",
-    "libmedia-common": "https://github.com/zhaohappy/common.git",
-    "npm-run-all2": "^6.1.2"
+  "files": [
+    "dist/**"
+  ],
+  "dependencies": {
+    "less": "^4.2.0",
+    "magic-string": "^0.30.12",
+    "marked": "^15.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }

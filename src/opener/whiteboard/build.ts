@@ -20,7 +20,7 @@ import fontsIBMPlexMonoMediumWoff2Url from '@tldraw/assets/fonts/IBMPlexMono-Med
 import fontsIBMPlexSansMediumWoff2Url from '@tldraw/assets/fonts/IBMPlexSans-Medium.woff2?url'
 import fontsIBMPlexSerifMediumWoff2Url from '@tldraw/assets/fonts/IBMPlexSerif-Medium.woff2?url'
 import fontsShantellSansTldrawishWoff2Url from '@tldraw/assets/fonts/Shantell_Sans-Tldrawish.woff2?url'
-import iconsIcon0MergedSvgUrl from '@tldraw/assets/icons/icon/0_merged.svg?url'
+import iconsIcon0MergedSvgUrl from '@tldraw/assets/icons/images/icon/0_merged.svg?url'
 import translationsZhCnJsonUrl from '@tldraw/assets/translations/zh-cn.json?url'
 
 export default {

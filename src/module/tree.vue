@@ -54,8 +54,7 @@
                         const pos = el.getBoundingClientRect().y;
                         if(pos <= UI.fontSize.value * 4.6 || pos >= document.documentElement.clientHeight)
                             el.scrollIntoView({
-                                'behavior': 'smooth',
-                                'block': 'center'
+                                'behavior': 'smooth'
                             });
                         el.classList.add('selected');
                         requestAnimationFrame(() => el.focus());
@@ -134,7 +133,7 @@
                         else
                             enabled.push(from_fd.path);
                     }
-                    FS.move(enabled, to_fd.path)
+                    FS.move(enabled, to_fd.path, true)
                         .catch(e => message({
                             "title": "资源管理器",
                             "content": {
@@ -266,7 +265,7 @@
         @dragleave.stop="($event.currentTarget as HTMLElement).classList.remove('moving')"
         @click="data.active = new Map()"
     >
-        <template v-for="(child, id) in data.child" :key="child.path">
+        <template v-for="(child, id) in data.child" :key="child.path + ',' + child.ctime">
 
             <tree v-if="child.type == 'dir'" :data="child" :data-position="data.path + ':' + id" />
 

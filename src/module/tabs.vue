@@ -3,6 +3,7 @@
 	import { contextMenu, registerCommand } from '@/utils';
 	import { ref, reactive, watch, nextTick, toRaw } from 'vue';
 	import I_OFF from "/images/icon/off.webp";
+	import Home from '@/alist/home.vue';
 
 	const tabs = reactive<Record<string, TabWindow>>({}),
 		current = ref<string>('');
@@ -52,8 +53,6 @@
 </script>
 
 <script lang="ts" setup>
-	import Home from '../alist/home.vue';
-
 	nextTick(() => registerCommand({
 		"title": "关闭当前工作区",
 		"name": "app.close_current",
@@ -73,7 +72,7 @@
 			>
 				<img :src="data.icon" onerror="this.style.display = 'none';" class="icon">
 				<span>{{ data.name }}</span>
-				<i class="close" @click.stop="delete tabs[i];"></i>
+				<i class="close" button vs-icon="x" @click.stop="delete tabs[i];"></i>
 			</div>
 		</template>
 	</TransitionGroup>
@@ -89,7 +88,7 @@
 			<div class="app-meta-header" @click="current = i">
 				<img :src="data.icon" onerror="this.style.display = 'none';" class="icon">
 				<span>{{ data.name }}</span>
-				<i class="close" @click="delete tabs[i];"></i>
+				<i vs-icon="x" class="close" @click="delete tabs[i];"></i>
 			</div>
 			<suspense>
 				<div class="webview" v-if="typeof data.content === 'string'" v-webview="data.content"></div>
@@ -107,8 +106,6 @@
 
 
 <style lang="scss" scoped>
-	@import '@/style/icon.scss';
-
 	.tab {
 		padding: .45rem;
 		display: flex;
@@ -190,13 +187,13 @@
 
 			>i.close{
 				display: none;
-				content: $icon_close;
 				width: 1rem;
 				height: 1rem;
 
 				position: absolute;
 				right: .35rem;
-				top: .5rem;
+				top: 50%;
+				transform: translateY(-50%);
 			}
 		}
 	}
@@ -234,7 +231,6 @@
 
 			>i {
 				pointer-events: all;
-				content: $icon_close;
 				position: absolute;
 				top: 1rem;
 				right: 1rem;
