@@ -8,7 +8,8 @@ run('mkdir -p ~/dist/');
 run('mkdir -p ~/toolchain/');
 
 // 克隆alist仓库
-run(`git clone https://github.com/alist-org/alist.git`);
+run(`git clone https://github.com/OpenListTeam/OpenList.git`);
+run(`mv OpenList alist`)
 run(`cp -r ~/vlist_pkg/* alist/public/dist/`);
 
 for(const arch in CC){
@@ -34,10 +35,10 @@ for(const arch in CC){
 -X 'github.com/alist-org/alist/v3/internal/conf.GoVersion=${
     runWithOutput('go version').split('go version ')[1]
 }'
--X 'github.com/alist-org/alist/v3/internal/conf.GitAuthor=${runWithOutput("git show -s --format='format:%aN <%ae>' HEAD")}'
--X 'github.com/alist-org/alist/v3/internal/conf.GitCommit=${runWithOutput('git log --pretty=format:"%h" -1')}'
--X 'github.com/alist-org/alist/v3/internal/conf.Version=${runWithOutput("git describe --long --tags --dirty --always")}' 
--X 'github.com/alist-org/alist/v3/internal/conf.WebVersion=5.6'`;
+-X 'github.com/OpenListTeam/OpenList/internal/conf.GitAuthor=${runWithOutput("git show -s --format='format:%aN <%ae>' HEAD")}'
+-X 'github.com/OpenListTeam/OpenList/internal/conf.GitCommit=${runWithOutput('git log --pretty=format:"%h" -1')}'
+-X 'github.com/OpenListTeam/OpenList/internal/conf.Version=${runWithOutput("git describe --long --tags --dirty --always")}' 
+-X 'github.com/OpenListTeam/OpenList/internal/conf.WebVersion=5.6'`;
     run(`go build --ldflags="-s -w ${addition}" -o alist`, {
         ...env,
         'CGO_ENABLED': '1'
